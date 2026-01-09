@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [settings, setSettings] = useState<GlobalSettings>({ githubToken: '', geminiApiKey: '' });
   const [loading, setLoading] = useState(false);
+  const [rowLoading, setRowLoading] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showConfig, setShowConfig] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -104,19 +105,7 @@ const App: React.FC = () => {
     if (!activeProject) return;
     if (!confirm(`Revert project "${activeProject.name}"? You will lose all changes.`)) return;
 
-    const remaining = projects.filter(p => p.id !== activeProject.id);
-    
-    if (remaining.length === 0) {
-      const next = createEmptyProject("Default Project");
-      setProjects([next]);
-      setActiveProjectId(next.id);
-    } else {
-      setProjects(remaining);
-      setActiveProjectId(remaining[0].id);
-    }
-    
-    setShowConfig(false);
-    setIsSidebarOpen(false);
+    updateActiveProject({ rows: activeProject.rows.map(r => ({...r, targetValue: r.originalTargetValue})) });
   };
 
   const updateActiveProject = (updates: Partial<Project>) => {
@@ -134,14 +123,13 @@ const App: React.FC = () => {
     try {
       const service = new GitHubService(activeProject.config, null);
       const { source, target } = await service.loadFiles();
-      activeProject.originalTargetData = target;
 
       const flatSource = flattenObject(source);
       const flatTarget = flattenObject(target);
       
       const newRows: TranslationRow[] = Object.keys(flatSource).filter(key => {
         let row = activeProject?.rows.filter(r => r.key === key)[0];
-        return typeof flatSource[key] === 'string' && (activeProject ? row.targetValue == row.originalTargetValue : true);
+        return typeof flatSource[key] === 'string' && (activeProject && row?.targetValue && row?.originalTargetValue ? row.targetValue === row.originalTargetValue : true);
       }).map(key => ({
         key,
         sourceValue: flatSource[key].toString(),
@@ -149,7 +137,7 @@ const App: React.FC = () => {
         originalTargetValue: flatTarget[key] ? flatTarget[key].toString() : '',
       }));
 
-      updateActiveProject({ rows: newRows });
+      updateActiveProject({ rows: newRows, originalTargetData: target });
       setShowConfig(false);
     } catch (err: any) {
       alert(`GitHub Sync Failed: ${err.message}`);
@@ -163,26 +151,33 @@ const App: React.FC = () => {
     
     // Explicit API Key validation
     if (!settings.geminiApiKey) {
-      alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
+      alert("⚠️ Gemini API Key Missing\nYou need to provide a valid Gemini API Key in Settings to use AI suggestions.");
       setShowSettings(true);
       return;
     }
 
-    setLoading(true);
     try {
-      const chunkSize = 15;
-      const updatedRows = [...filteredRows];
+      const chunkSize = 10;
+      const updatedRows = [...filteredRows].filter(r => !r.aiSuggestion || r.aiSuggestion === '' || !rowLoading[r.key]);
       
+      let newRowLoading = {...rowLoading};
+      updatedRows.forEach(r => { newRowLoading[r.key] = true; });
+      setRowLoading({...rowLoading, ...newRowLoading});
+
       for (let i = 0; i < updatedRows.length; i += chunkSize) {
         const chunk = updatedRows.slice(i, i + chunkSize);
-        const sourceTexts = chunk.map(r => ({ key: r.key, value: r.sourceValue }));
-        
+        const sourceTexts = chunk.map(r => { 
+          return ({ key: r.key, value: r.sourceValue });
+        });
+
         const suggestions = await getTranslationSuggestions(
           activeProject.selectedModel, settings.geminiApiKey,
           activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
           activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
           sourceTexts
         );
+        chunk.forEach(r => { newRowLoading[r.key] = false; });
+        setRowLoading({...rowLoading, ...newRowLoading});
 
         Object.keys(suggestions).forEach(key => {
           const rowIndex = updatedRows.findIndex(r => r.key === key);
@@ -193,7 +188,6 @@ const App: React.FC = () => {
     } catch (err: any) {
       alert(`AI Engine Error: ${err.message}. Try re-authenticating your Gemini Key in Settings.`);
     } finally {
-      setLoading(false);
     }
   };
 
@@ -243,14 +237,16 @@ const App: React.FC = () => {
       r.targetValue.toLowerCase().includes(queryWithoutTag)
     ) && 
     (
-      ((!searchTerm.includes("#modified")) || r.targetValue !== r.originalTargetValue) &&
-      ((!searchTerm.includes("#done")) || r.sourceValue !== r.originalTargetValue && r.targetValue === r.originalTargetValue) &&
-      ((!searchTerm.includes("#undone")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '') &&
-      ((!searchTerm.includes("#doing")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '' || r.targetValue !== r.originalTargetValue) &&
-      ((!searchTerm.includes("#ai")) || (r.aiSuggestion && r.aiSuggestion !== '')) &&
-      ((!searchTerm.includes("#noai")) || (!r.aiSuggestion || r.aiSuggestion === '')) &&
-      ((!searchTerm.includes("#empty")) || (!r.targetValue || r.targetValue === '')) &&
-      ((!searchTerm.includes("#key")) || (r.key.toLowerCase().includes(queryWithoutTag)))
+      ((!searchTerm.toLowerCase().includes("#modified")) || r.targetValue !== r.originalTargetValue) &&
+      ((!searchTerm.toLowerCase().includes("#done")) || r.sourceValue !== r.originalTargetValue && r.targetValue === r.originalTargetValue) &&
+      ((!searchTerm.toLowerCase().includes("#undone")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '') &&
+      ((!searchTerm.toLowerCase().includes("#doing")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '' || r.targetValue !== r.originalTargetValue) &&
+      ((!searchTerm.toLowerCase().includes("#ai")) || (r.aiSuggestion && r.aiSuggestion !== '')) &&
+      ((!searchTerm.toLowerCase().includes("#noai")) || (!r.aiSuggestion || r.aiSuggestion === '' || !rowLoading[r.key])) &&
+      ((!searchTerm.toLowerCase().includes("#empty")) || (!r.targetValue || r.targetValue === '')) &&
+      ((!searchTerm.toLowerCase().includes("#key")) || (r.key.toLowerCase().includes(queryWithoutTag))) &&
+      ((!searchTerm.toLowerCase().includes("#inarray")) || (/^.*\.\d+$/).test(r.key)) &&
+      ((!searchTerm.toLowerCase().includes("#aifetching")) || (rowLoading[r.key] === true))
     )
   ) || [];
 
@@ -573,7 +569,11 @@ const App: React.FC = () => {
                             <div className="w-full relative group">
                               <label className="lg:hidden text-[9px] font-black text-purple-500 uppercase mb-3 block tracking-widest">AI Suggestion</label>
                               <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] min-h-[120px] lg:min-h-[160px] whitespace-pre-wrap transition-all leading-relaxed font-bold ${row.aiSuggestion ? 'bg-indigo-50/50 border border-indigo-100 text-indigo-900 italic shadow-xl shadow-indigo-500/10' : 'bg-slate-50/30 border border-dashed border-slate-200 text-slate-200 flex items-center justify-center font-black text-[10px] uppercase tracking-widest opacity-50'}`}>
-                                {row.aiSuggestion || "Awaiting AI"}
+                                {row.aiSuggestion || (rowLoading[row.key] ? 
+                                  <div>"Awaiting AI"<div className="w-10 h-10 centered relative">
+                                    <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
+                                    <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                  </div></div> : "No AI")}
                               </div>
                               {row.aiSuggestion ? (
                                 <button 
@@ -596,13 +596,14 @@ const App: React.FC = () => {
                                       return;
                                     }
                                     try {
+                                      setRowLoading({...rowLoading, [row.key]: true});
                                       const suggestions = await getTranslationSuggestions(
                                         activeProject.selectedModel, settings.geminiApiKey,
                                         activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
                                         activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
                                         [{ key: row.key, value: row.sourceValue }]
                                       );
-
+                                      setRowLoading({...rowLoading, [row.key]: false});
                                       Object.keys(suggestions).forEach(key => {
                                         const rowIndex = updatedRows.findIndex(r => r.key === key);
                                         if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];

@@ -33,6 +33,7 @@ export async function getTranslationSuggestions(
     return JSON.parse(response.text);
   } catch (e) {
     console.error("Failed to parse Gemini response", e);
+    console.error("Response text:", response.text);
     return {};
   }
 }

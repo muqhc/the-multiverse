@@ -7,7 +7,7 @@ export function flattenObject(obj: any, prefix = ''): Record<string, ValueType> 
     onVisit: {
       callback: node => {
         let raw = node.getPath()
-        let key = raw.substring(1,raw.length-1).replace(/\['?/g,'.').replace(/'?\]/g,'');
+        let key = raw.substring(1,raw.length-1).replaceAll("][",'.').replaceAll("\"","\'");
         newObj[key] = node.val;
       },
       filters: node => node.nodeType !== 'object' && node.nodeType !== 'array'
@@ -21,8 +21,8 @@ export function unflattenObject(data: Record<string, ValueType>, base: Record<st
   for (const rawKey in data) {
     const keys = rawKey.split('.');
     keys.reduce((acc, k, j) => {
-      k = k.replaceAll("\"","")
-      if (keys[j + 1]?.includes("\"")) {
+      k = k.replaceAll("\'","")
+      if (keys[j + 1]?.includes("\'")) {
         return acc[k] || (acc[k] = {});
       }
       if (keys[j + 1]) {
@@ -41,4 +41,11 @@ export function saveToLocal(key: string, data: any) {
 export function loadFromLocal(key: string) {
   const data = localStorage.getItem(key);
   return data ? JSON.parse(data) : null;
+}
+
+export function asciiReference(str: string) {
+  return str.split('').map(c => {
+    const code = c.charCodeAt(0);
+    return (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) ? c : `%${code.toString(16).toUpperCase()}`;
+  }).join('');
 }

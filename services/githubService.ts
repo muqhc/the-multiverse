@@ -1,4 +1,5 @@
 
+import { asciiReference } from '@/utils';
 import { GitHubConfig } from '../types';
 
 export class GitHubService {
@@ -11,7 +12,7 @@ export class GitHubService {
   }
 
   private async fetchRaw(path: string) {
-    const url = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${path}?ref=${this.config.branch}`;
+    const url = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${asciiReference(path)}?ref=${asciiReference(this.config.branch)}`;
     const response = await fetch(url, 
       this.token ? {
         headers: {
@@ -39,7 +40,7 @@ export class GitHubService {
   }
 
   async pushFile(content: string, path: string, message: string) {
-    const metadataUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${path}?ref=${this.config.branch}`;
+    const metadataUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${asciiReference(path)}?ref=${asciiReference(this.config.branch)}`;
     const metadataRes = await fetch(metadataUrl, {
       headers: {
         Authorization: `token ${this.token}`,
@@ -49,7 +50,7 @@ export class GitHubService {
     if (!metadataRes.ok) throw new Error("Could not find existing file for update.");
     const metadata = await metadataRes.json();
 
-    const updateUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${path}`;
+    const updateUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${asciiReference(path)}`;
     const response = await fetch(updateUrl, {
       method: 'PUT',
       headers: {
