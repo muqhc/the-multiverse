@@ -25,6 +25,7 @@ export enum GeminiModel {
 export interface GlobalSettings {
   githubToken: string;
   geminiApiKey: string;
+  suggestionChunkSize: number;
 }
 
 export interface Project {

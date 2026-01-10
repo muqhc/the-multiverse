@@ -11,7 +11,7 @@ const STORAGE_KEY = 'multiverse_persistent_storage_v1';
 const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<GlobalSettings>({ githubToken: '', geminiApiKey: '' });
+  const [settings, setSettings] = useState<GlobalSettings>({ githubToken: '', geminiApiKey: '', suggestionChunkSize: 10 });
   const [loading, setLoading] = useState(false);
   const [rowLoading, setRowLoading] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +27,7 @@ const App: React.FC = () => {
     if (saved && saved.projects && saved.projects.length > 0) {
       setProjects(saved.projects);
       setActiveProjectId(saved.activeProjectId || saved.projects[0].id);
-      setSettings(saved.settings || { githubToken: '', geminiApiKey: '' });
+      setSettings(saved.settings || { githubToken: '', geminiApiKey: '', suggestionChunkSize: 10 });
     } else {
       const demo = createEmptyProject("Default Project");
       setProjects([demo]);
@@ -715,6 +715,22 @@ const App: React.FC = () => {
                     <p className="mt-5 px-6 text-[11px] text-slate-400 font-bold leading-relaxed opacity-70 italic">
                       Manifest Encryption: Tokens are stored exclusively in your browser's private localStorage. We never route keys through proxy servers.
                     </p>
+                  </section>
+
+                  <section>
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-2.5 h-10 bg-indigo-500 rounded-full"></div>
+                      <label className="text-[12px] font-black text-slate-500 uppercase tracking-widest">AI Suggestion Chunk Size: {settings.suggestionChunkSize}</label>
+                    </div>
+                    <input 
+                      type="range"
+                      min="1"
+                      max="100"
+                      step="1"
+                      className="w-full p-6 lg:p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all shadow-inner range-lg cursor-pointer"
+                      value={settings.suggestionChunkSize}
+                      onChange={e => setSettings({ ...settings, suggestionChunkSize: parseInt(e.target.value) })}
+                    />
                   </section>
                 </div>
 
