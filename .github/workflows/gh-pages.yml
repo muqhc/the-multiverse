@@ -28,11 +28,11 @@ jobs:
     - name: Build
       run: |
         npm ci
-        npm run build-git
+        npm run build-gh-pages
 
     - name: Push to gh-pages
       uses: JamesIves/github-pages-deploy-action@v4
       with:
-        folder: dist
+        folder: dist-gh-pages
         branch: gh-pages
 
