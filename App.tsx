@@ -576,15 +576,26 @@ const App: React.FC = () => {
                                   </div></div> : "No AI")}
                               </div>
                               {row.aiSuggestion ? (
-                                <button 
-                                  onClick={() => {
-                                    const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
-                                    updateActiveProject({ rows: newRows });
-                                  }}
-                                  className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-white text-indigo-600 p-3 lg:p-4 rounded-2xl shadow-2xl opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all border border-indigo-50 active:scale-75 hover:bg-indigo-50"
-                                >
-                                  <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                </button>
+                                <div>
+                                  <button 
+                                    onClick={() => {
+                                      const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
+                                      updateActiveProject({ rows: newRows });
+                                    }}
+                                    className="absolute top-3 right-20 lg:top-6 lg:right-17 bg-white text-rose-600 font-black p-2 lg:p-3 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-rose-50 active:scale-75 hover:bg-rose-50"
+                                  >
+                                    Del
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
+                                      updateActiveProject({ rows: newRows });
+                                    }}
+                                    className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-white text-lime-600 p-3 lg:p-4 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-lime-50 active:scale-75 hover:bg-lime-50"
+                                  >
+                                    <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                  </button>
+                                </div>
                               ) : (
                                 <button 
                                   onClick={async () => {
