@@ -664,7 +664,7 @@ const App: React.FC = () => {
                     </div>
                     <input 
                       type="password"
-                      placeholder="ghp_**************************************"
+                      placeholder="**************************************"
                       className="w-full p-6 lg:p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all shadow-inner"
                       value={settings.githubToken}
                       onChange={e => setSettings({ ...settings, githubToken: e.target.value })}

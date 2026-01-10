@@ -1,6 +1,7 @@
 
-import { asciiReference } from '@/utils';
+import { Octokit } from 'octokit';
 import { GitHubConfig } from '../types';
+import { bytesToBase64, textToBytes } from '@/utils';
 
 export class GitHubService {
   private config: GitHubConfig;
@@ -12,7 +13,7 @@ export class GitHubService {
   }
 
   private async fetchRaw(path: string) {
-    const url = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${asciiReference(path)}?ref=${asciiReference(this.config.branch)}`;
+    const url = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(this.config.branch)}`;
     const response = await fetch(url, 
       this.token ? {
         headers: {
@@ -40,26 +41,27 @@ export class GitHubService {
   }
 
   async pushFile(content: string, path: string, message: string) {
-    const metadataUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${asciiReference(path)}?ref=${asciiReference(this.config.branch)}`;
-    const metadataRes = await fetch(metadataUrl, {
-      headers: {
-        Authorization: `token ${this.token}`,
-      },
+    const octokit = new Octokit({ auth: this.token });
+    const metadataRes = await octokit.request("GET /repos/{owner}/{repo}/contents/{path}?={ref}", {
+      owner: this.config.owner,
+      repo: this.config.repo,
+      path: path,
+      ref: this.config.branch
     });
     
-    if (!metadataRes.ok) throw new Error("Could not find existing file for update.");
-    const metadata = await metadataRes.json();
-
-    const updateUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${asciiReference(path)}`;
+    if (!metadataRes.data) throw new Error("Could not find existing file for update.");
+    const metadata = metadataRes.data;
+    
+    const updateUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${encodeURIComponent(path)}`;
     const response = await fetch(updateUrl, {
       method: 'PUT',
       headers: {
         Authorization: `token ${this.token}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/vnd.github+json',
       },
       body: JSON.stringify({
-        message,
-        content: btoa(unescape(encodeURIComponent(content))),
+        message: message,
+        content: bytesToBase64(textToBytes(content)),
         sha: metadata.sha,
         branch: this.config.branch,
       }),

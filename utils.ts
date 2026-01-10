@@ -43,9 +43,22 @@ export function loadFromLocal(key: string) {
   return data ? JSON.parse(data) : null;
 }
 
-export function asciiReference(str: string) {
-  return str.split('').map(c => {
-    const code = c.charCodeAt(0);
-    return (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) ? c : `%${code.toString(16).toUpperCase()}`;
-  }).join('');
+export function textToBytes(text: string) {
+  const encoder = new TextEncoder();
+  return encoder.encode(text);
+}
+
+export function bytesToText(bytes: Uint8Array) {
+  const decoder = new TextDecoder();
+  return decoder.decode(bytes);
+}
+
+export function base64ToBytes(base64: string) {
+  const binString = atob(base64);
+  return Uint8Array.from(binString, (m) => m.codePointAt(0));
+}
+
+export function bytesToBase64(bytes: Uint8Array) {
+  const binString = Array.from(bytes, (x) => String.fromCodePoint(x)).join("");
+  return btoa(binString);
 }
