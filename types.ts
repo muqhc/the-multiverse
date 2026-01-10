@@ -16,8 +16,10 @@ export interface TranslationRow {
 }
 
 export enum GeminiModel {
-  FLASH = 'gemini-3-flash-preview',
-  PRO = 'gemini-3-pro-preview'
+  'G3-FLASH-PRE' = 'gemini-3-flash-preview',
+  'G3-PRO-PRE' = 'gemini-3-pro-preview',
+  'G2.5-FLASH' = 'gemini-2.5-flash',
+  'G2.5-PRO' = 'gemini-2.5-pro',
 }
 
 export interface GlobalSettings {

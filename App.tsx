@@ -57,7 +57,7 @@ const App: React.FC = () => {
       name,
       config: { owner: '', repo: '', branch: 'main', sourcePath: '', targetPath: '' },
       rows: [],
-      selectedModel: GeminiModel.FLASH,
+      selectedModel: GeminiModel['G3-FLASH-PRE'],
       lastUpdated: Date.now(),
       originalTargetData: {},
     };
@@ -129,13 +129,16 @@ const App: React.FC = () => {
       
       const newRows: TranslationRow[] = Object.keys(flatSource).filter(key => {
         let row = activeProject?.rows.filter(r => r.key === key)[0];
-        return typeof flatSource[key] === 'string' && (activeProject && row?.targetValue && row?.originalTargetValue ? row.targetValue === row.originalTargetValue : true);
-      }).map(key => ({
-        key,
-        sourceValue: flatSource[key].toString(),
-        targetValue: flatTarget[key] ? flatTarget[key].toString() : '',
-        originalTargetValue: flatTarget[key] ? flatTarget[key].toString() : '',
-      }));
+        return typeof flatSource[key] === 'string';
+      }).map(key => {
+        let row = activeProject?.rows.filter(r => r.key === key)[0];
+        return ({
+          key,
+          sourceValue: flatSource[key].toString(),
+          targetValue: (activeProject ? row?.targetValue === row?.originalTargetValue : true) ? (flatTarget[key] ? flatTarget[key].toString() : '') : row?.targetValue || '',
+          originalTargetValue: flatTarget[key] ? flatTarget[key].toString() : '',
+        });
+      });
 
       updateActiveProject({ rows: newRows, originalTargetData: target });
       setShowConfig(false);
@@ -183,8 +186,8 @@ const App: React.FC = () => {
           const rowIndex = updatedRows.findIndex(r => r.key === key);
           if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
         });
+        updateActiveProject({ rows: updatedRows });
       }
-      updateActiveProject({ rows: updatedRows });
     } catch (err: any) {
       alert(`AI Engine Error: ${err.message}. Try re-authenticating your Gemini Key in Settings.`);
     } finally {
@@ -433,8 +436,9 @@ const App: React.FC = () => {
                         value={activeProject.selectedModel}
                         onChange={e => updateActiveProject({ selectedModel: e.target.value as GeminiModel })}
                       >
-                        <option value={GeminiModel.FLASH}>Gemini 3 Flash (Performant)</option>
-                        <option value={GeminiModel.PRO}>Gemini 3 Pro (Reasoning)</option>
+                        {Object.values(GeminiModel).map(model => (
+                          <option value={model}>{model}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -555,10 +559,21 @@ const App: React.FC = () => {
                                 value={row.targetValue}
                                 style={{ resize: 'none' }}
                                 onChange={e => {
-                                  const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
+                                  const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, 
+                                    targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
+                                  } : r);
                                   updateActiveProject({ rows: newRows });
                                 }}
-                                placeholder="Add translation..."
+                                onKeyDown={e => {
+                                  if (e.key === 'Tab') {
+                                    e.preventDefault();
+                                    const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, 
+                                      targetValue: row.originalTargetValue
+                                    } : r);
+                                    updateActiveProject({ rows: newRows });
+                                  }
+                                }}
+                                placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
                               />
                               {row.targetValue !== row.originalTargetValue && (
                                 <span className="absolute -top-3 -right-3 bg-amber-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">Modified</span>
