@@ -219,7 +219,7 @@ const App: React.FC = () => {
     try {
       const flatData: Record<string, string> = {};
       activeProject.rows.forEach(r => { flatData[r.key] = r.targetValue; });
-      const content = JSON.stringify(unflattenObject(flatData, activeProject.originalTargetData), null, 2);
+      const content = JSON.stringify(unflattenObject(flatData), null, 4);
       
       const service = new GitHubService(activeProject.config, settings.githubToken);
       await service.pushFile(content, activeProject.config.targetPath, commitMessage);
