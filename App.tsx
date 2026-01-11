@@ -239,7 +239,7 @@ const App: React.FC = () => {
     if (!activeProject) return;
     const flatData: Record<string, string> = {};
     activeProject.rows.forEach(r => { flatData[r.key] = r.targetValue; });
-    const jsonString = JSON.stringify(unflattenObject(flatData), null, 2);
+    const jsonString = JSON.stringify(unflattenObject(flatData), null, 4);
     navigator.clipboard.writeText(jsonString);
     alert("Target JSON copied to clipboard!");
   };
