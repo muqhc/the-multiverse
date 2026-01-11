@@ -21,6 +21,8 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
+  const [showDialogSuggestAll, setShowDialogSuggestAll] = useState(false);
+  const [additionalInstructions, setAdditionalInstructions] = useState('');
 
   // Load from Browser Storage
   useEffect(() => {
@@ -180,7 +182,8 @@ const App: React.FC = () => {
           activeProject.selectedModel, settings.geminiApiKey,
           activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
           activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
-          sourceTexts
+          sourceTexts,
+          additionalInstructions
         );
         chunk.forEach(r => { newRowLoading[r.key] = false; });
         
@@ -224,7 +227,7 @@ const App: React.FC = () => {
       updateActiveProject({
         rows: activeProject.rows.map(r => ({ ...r, originalTargetValue: r.targetValue }))
       });
-      alert("Success! Changes pushed to GitHub.");
+      alert(`Success! Changes pushed to GitHub.\nMessage: ${commitMessage}\nRepo/Branch: https://github.com/${activeProject.config.owner}/${activeProject.config.repo}/${activeProject.config.branch}`);
     } catch (err: any) {
       alert(`GitHub Push Failed: ${err.message}`);
     } finally {
@@ -264,7 +267,6 @@ const App: React.FC = () => {
         ((!searchTerm.includes("#ai")) || (r.aiSuggestion && r.aiSuggestion !== '')) &&
         ((!searchTerm.includes("#noai")) || (!r.aiSuggestion || r.aiSuggestion === '' || !rowAiLoading[r.key])) &&
         ((!searchTerm.includes("#empty")) || (!r.targetValue || r.targetValue === '')) &&
-        ((!searchTerm.includes("#key")) || (r.key.toLowerCase().includes(queryWithoutTag))) &&
         ((!searchTerm.includes("#inarray")) || (/^.*\.\d+$/).test(r.key)) &&
         ((!searchTerm.includes("#aifetching")) || (rowAiLoading[r.key] === true))
       ))}
@@ -389,7 +391,7 @@ const App: React.FC = () => {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
                   </button>
                   <button
-                    onClick={handleSuggestAll}
+                    onClick={e => {setShowDialogSuggestAll(true);}}
                     disabled={loading || activeProject.rows.length === 0}
                     className="flex-1 lg:flex-none px-6 lg:px-8 py-3.5 lg:py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-3 text-sm font-black disabled:opacity-50 transition-all active:scale-95"
                   >
@@ -779,6 +781,53 @@ const App: React.FC = () => {
                     className="w-full py-7 bg-slate-900 text-white rounded-[2.5rem] lg:rounded-[3rem] font-black uppercase tracking-widest text-[11px] active:scale-95 transition-all shadow-3xl shadow-slate-900/20"
                   >
                     Confirm & Sync Manifest
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AI Suggestions Dialog */}
+        {showDialogSuggestAll && (
+          <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-2xl z-[100] flex items-center justify-center p-6 lg:p-12">
+            <div className="bg-white w-full max-w-2xl rounded-[3rem] lg:rounded-[4.5rem] shadow-[0_64px_256px_-64px_rgba(0,0,0,0.7)] overflow-hidden animate-in zoom-in-95 duration-500 max-h-[95vh] overflow-y-auto">
+              <div className="p-10 lg:p-20 bg-indigo-50">
+                <div className="flex justify-between items-center mb-12 lg:mb-16">
+                  <div>
+                    <h2 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tighter">AI Suggest</h2>
+                    <p className="text-[11px] text-slate-400 font-black uppercase tracking-[0.4em] mt-4">for all of current filtered rows</p>
+                  </div>
+                  <button onClick={() => setShowDialogSuggestAll(false)} className="p-5 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-full transition-all active:scale-75 shadow-sm">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                
+                <div className="space-y-12 lg:space-y-16">
+                  <section>
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-2.5 h-10 bg-indigo-500 rounded-full"></div>
+                      <label className="text-[12px] font-black text-slate-500 uppercase tracking-widest">Additional Instructions</label>
+                    </div>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Use formal language, local idioms, etc."
+                      className="w-full p-6 lg:p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all shadow-inner"
+                      value={additionalInstructions}
+                      onChange={e => setAdditionalInstructions(e.target.value)}
+                    />
+                  </section>
+                </div>
+
+                <div className="mt-16 lg:mt-20 pt-12 border-t border-slate-100">
+                  <button 
+                    onClick={() => {
+                      setShowDialogSuggestAll(false);
+                      handleSuggestAll();
+                    }}
+                    className="w-full py-7 bg-indigo-900 text-white rounded-[2.5rem] lg:rounded-[3rem] font-black uppercase tracking-widest text-[11px] active:scale-95 transition-all shadow-3xl shadow-indigo-900/20"
+                  >
+                    Confirm & AI Suggest
                   </button>
                 </div>
               </div>

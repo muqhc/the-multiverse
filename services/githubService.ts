@@ -42,15 +42,21 @@ export class GitHubService {
 
   async pushFile(content: string, path: string, message: string) {
     const octokit = new Octokit({ auth: this.token });
-    const metadataRes = await octokit.request("GET /repos/{owner}/{repo}/contents/{path}?={ref}", {
-      owner: this.config.owner,
-      repo: this.config.repo,
-      path: path,
-      ref: this.config.branch
-    });
+    const metadataRes = await (async () => {
+      const owner = this.config.owner;
+      const repo = this.config.repo;
+      const ref = this.config.branch;
+      return octokit.request(`GET /repos/${owner}/${repo}/contents/${path}?=${ref}`, {
+        owner: owner,
+        repo: repo,
+        path: path,
+        ref: ref
+      })
+    })();
     
     if (!metadataRes.data) throw new Error("Could not find existing file for update.");
     const metadata = metadataRes.data;
+    console.log("File metadata:", metadata);
     
     const updateUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${encodeURIComponent(path)}`;
     const response = await fetch(updateUrl, {

@@ -7,7 +7,8 @@ export async function getTranslationSuggestions(
   apiKey: string,
   sourceLang: string,
   targetLang: string,
-  texts: { key: string; value: string }[]
+  texts: { key: string; value: string }[],
+  additionalIntstructions = ""
 ) {
   const ai = new GoogleGenAI({ apiKey: apiKey });
   const isGemma = model.startsWith('gemma');
@@ -26,8 +27,9 @@ export async function getTranslationSuggestions(
       contents: `Translate the following ${sourceLang} strings to ${targetLang}. 
       Provide the translations in a JSON object where keys match the input keys. 
       Be concise and context-aware.
-      You SHOULD NOT include any other text outside the JSON object.
-      ${isGemini ? "" : `Output only JSON under this schema: ${JSON.stringify(schema)}`}
+      You SHOULD NOT include any other text outside the JSON object.${
+      additionalIntstructions ? `\nAdditional Instructions: [${additionalIntstructions}]` : ""}${
+      isGemini ? "" : `\nOutput only JSON under this schema: ${JSON.stringify(schema)}`}
       Input: ${JSON.stringify(texts)}`,
       config: isGemini ? {
         responseMimeType: "application/json",
