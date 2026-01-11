@@ -20,6 +20,7 @@ export enum GeminiModel {
   'G3-PRO-PRE' = 'gemini-3-pro-preview',
   'G2.5-FLASH' = 'gemini-2.5-flash',
   'G2.5-PRO' = 'gemini-2.5-pro',
+  'GA3-27B-IT' = 'gemma-3-27b-it',
 }
 
 export interface GlobalSettings {

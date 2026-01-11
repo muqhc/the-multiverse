@@ -13,8 +13,9 @@ const App: React.FC = () => {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [settings, setSettings] = useState<GlobalSettings>({ githubToken: '', geminiApiKey: '', suggestionChunkSize: 10 });
   const [loading, setLoading] = useState(false);
-  const [rowLoading, setRowLoading] = useState<Record<string, boolean>>({});
-  const [searchTerm, setSearchTerm] = useState('');
+  const [rowAiLoading, setRowAiLoading] = useState<Record<string, boolean>>({});
+  const [rowAiTemp, setRowAiTemp] = useState<Record<string, string>>({});
+  const [searchTerms, setSearchTerms] = useState('');
   const [showConfig, setShowConfig] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -137,6 +138,7 @@ const App: React.FC = () => {
           sourceValue: flatSource[key].toString(),
           targetValue: (activeProject ? row?.targetValue === row?.originalTargetValue : true) ? (flatTarget[key] ? flatTarget[key].toString() : '') : row?.targetValue || '',
           originalTargetValue: flatTarget[key] ? flatTarget[key].toString() : '',
+          aiSuggestion: row ? (row.aiSuggestion || '') : '',
         });
       });
 
@@ -161,11 +163,12 @@ const App: React.FC = () => {
 
     try {
       const chunkSize = 10;
-      const updatedRows = [...filteredRows].filter(r => !r.aiSuggestion || r.aiSuggestion === '' || !rowLoading[r.key]);
+      const updatedRows = [...filteredRows].filter(r => (r.aiSuggestion === undefined || r.aiSuggestion === '' ) && !rowAiLoading[r.key]);
+      const newRows = [...activeProject.rows]
       
-      let newRowLoading = {...rowLoading};
+      let newRowLoading = {...rowAiLoading};
       updatedRows.forEach(r => { newRowLoading[r.key] = true; });
-      setRowLoading({...rowLoading, ...newRowLoading});
+      setRowAiLoading({...rowAiLoading, ...newRowLoading});
 
       for (let i = 0; i < updatedRows.length; i += chunkSize) {
         const chunk = updatedRows.slice(i, i + chunkSize);
@@ -180,14 +183,20 @@ const App: React.FC = () => {
           sourceTexts
         );
         chunk.forEach(r => { newRowLoading[r.key] = false; });
-        setRowLoading({...rowLoading, ...newRowLoading});
-
+        
         Object.keys(suggestions).forEach(key => {
-          const rowIndex = updatedRows.findIndex(r => r.key === key);
-          if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
+          const rowIndex = newRows.findIndex(r => r.key === key);
+          if (rowIndex !== -1) newRows[rowIndex].aiSuggestion = suggestions[key];
         });
-        updateActiveProject({ rows: updatedRows });
+        Object.keys(suggestions).forEach(key => {
+          setRowAiTemp({...rowAiTemp, [key]: suggestions[key]});
+        });
       }
+      setRowAiLoading({...rowAiLoading, ...newRowLoading});
+      updateActiveProject({ rows: newRows });
+      let updatedAiTemp = {...rowAiTemp};
+      updatedRows.forEach(r => { delete updatedAiTemp[r.key]; });
+      setRowAiTemp(updatedAiTemp);
     } catch (err: any) {
       alert(`AI Engine Error: ${err.message}. Try re-authenticating your Gemini Key in Settings.`);
     } finally {
@@ -232,24 +241,33 @@ const App: React.FC = () => {
     alert("Target JSON copied to clipboard!");
   };
 
-  const queryWithoutTag = searchTerm.toLowerCase().substring(0, searchTerm.includes("#") ? searchTerm.indexOf("#") : searchTerm.length).trim();
-  const filteredRows = activeProject?.rows.filter(r => 
-    (
-      r.key.toLowerCase().includes(queryWithoutTag) || 
-      r.sourceValue.toLowerCase().includes(queryWithoutTag) ||
-      r.targetValue.toLowerCase().includes(queryWithoutTag)
-    ) && 
-    (
-      ((!searchTerm.toLowerCase().includes("#modified")) || r.targetValue !== r.originalTargetValue) &&
-      ((!searchTerm.toLowerCase().includes("#done")) || r.sourceValue !== r.originalTargetValue && r.targetValue === r.originalTargetValue) &&
-      ((!searchTerm.toLowerCase().includes("#undone")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '') &&
-      ((!searchTerm.toLowerCase().includes("#doing")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '' || r.targetValue !== r.originalTargetValue) &&
-      ((!searchTerm.toLowerCase().includes("#ai")) || (r.aiSuggestion && r.aiSuggestion !== '')) &&
-      ((!searchTerm.toLowerCase().includes("#noai")) || (!r.aiSuggestion || r.aiSuggestion === '' || !rowLoading[r.key])) &&
-      ((!searchTerm.toLowerCase().includes("#empty")) || (!r.targetValue || r.targetValue === '')) &&
-      ((!searchTerm.toLowerCase().includes("#key")) || (r.key.toLowerCase().includes(queryWithoutTag))) &&
-      ((!searchTerm.toLowerCase().includes("#inarray")) || (/^.*\.\d+$/).test(r.key)) &&
-      ((!searchTerm.toLowerCase().includes("#aifetching")) || (rowLoading[r.key] === true))
+  const filteredRows = activeProject?.rows?.filter?.(r => 
+    searchTerms.toLowerCase().split("||").some((searchTerm) => { 
+      const queryWithoutTag = searchTerm.toLowerCase().substring(0, searchTerms.includes("#") ? searchTerms.indexOf("#") : searchTerms.length).trim();
+      return ((!searchTerm.includes("#reg") ? (
+        r.key.toLowerCase().includes(queryWithoutTag) || 
+        (!searchTerm.includes("#key")) && (
+          r.sourceValue.toLowerCase().includes(queryWithoutTag) ||
+          r.targetValue.toLowerCase().includes(queryWithoutTag)))
+       :
+      (searchTerm.includes("#reg") && (
+        new RegExp(queryWithoutTag).test(r.key.toLowerCase()) || 
+        (!searchTerm.includes("#key")) && (
+          new RegExp(queryWithoutTag).test(r.sourceValue.toLowerCase()) ||
+          new RegExp(queryWithoutTag).test(r.targetValue.toLowerCase())))
+      )) && 
+      (
+        ((!searchTerm.includes("#modified")) || r.targetValue !== r.originalTargetValue) &&
+        ((!searchTerm.includes("#done")) || r.sourceValue !== r.originalTargetValue && r.targetValue === r.originalTargetValue) &&
+        ((!searchTerm.includes("#undone")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '') &&
+        ((!searchTerm.includes("#doing")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '' || r.targetValue !== r.originalTargetValue) &&
+        ((!searchTerm.includes("#ai")) || (r.aiSuggestion && r.aiSuggestion !== '')) &&
+        ((!searchTerm.includes("#noai")) || (!r.aiSuggestion || r.aiSuggestion === '' || !rowAiLoading[r.key])) &&
+        ((!searchTerm.includes("#empty")) || (!r.targetValue || r.targetValue === '')) &&
+        ((!searchTerm.includes("#key")) || (r.key.toLowerCase().includes(queryWithoutTag))) &&
+        ((!searchTerm.includes("#inarray")) || (/^.*\.\d+$/).test(r.key)) &&
+        ((!searchTerm.includes("#aifetching")) || (rowAiLoading[r.key] === true))
+      ))}
     )
   ) || [];
 
@@ -431,13 +449,15 @@ const App: React.FC = () => {
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Intelligence Core</label>
-                      <select
+                      <select 
                         className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none appearance-none cursor-pointer"
                         value={activeProject.selectedModel}
                         onChange={e => updateActiveProject({ selectedModel: e.target.value as GeminiModel })}
                       >
                         {Object.values(GeminiModel).map(model => (
-                          <option value={model}>{model}</option>
+                          <option value={model} title={model.startsWith("gemma") ? "Gemma<=3 is not support json mime (unstable)" : ""}>
+                            {model} {model.startsWith("gemma") ? "(unstable)" : ""}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -501,8 +521,8 @@ const App: React.FC = () => {
                   <input 
                     type="text" 
                     placeholder="Search strings, keys, or translations..." 
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
+                    value={searchTerms}
+                    onChange={e => setSearchTerms(e.target.value)}
                     className="w-full pl-12 lg:pl-14 pr-8 py-3.5 lg:py-4 bg-slate-50 border-none rounded-[1.5rem] text-sm outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner"
                   />
                   <svg className="w-5 h-5 lg:w-6 lg:h-6 absolute left-4 lg:left-5 top-3 lg:top-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -520,8 +540,17 @@ const App: React.FC = () => {
                     <div className="w-24 h-24 bg-white rounded-[3rem] mb-6 flex items-center justify-center border border-slate-100 text-slate-100 shadow-sm">
                       <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                     </div>
-                    <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">Manifest Empty</p>
-                    <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Fetch files from your repository to start real-time localization.</p>
+                    {
+                      activeProject.rows.length > 0
+                      ? <div>
+                        <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">No Search Results</p>
+                        <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Try different search terms.</p>
+                      </div>
+                      : <div>
+                        <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">Manifest Empty</p>
+                        <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Fetch files from your repository to start real-time localization.</p>
+                      </div>
+                    }
                   </div>
                 ) : (
                   <div className="space-y-6 lg:space-y-0 lg:bg-white lg:border lg:border-slate-200 lg:rounded-[3rem] lg:shadow-sm lg:overflow-hidden min-w-full">
@@ -583,14 +612,24 @@ const App: React.FC = () => {
                             {/* AI Column */}
                             <div className="w-full relative group">
                               <label className="lg:hidden text-[9px] font-black text-purple-500 uppercase mb-3 block tracking-widest">AI Suggestion</label>
-                              <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] min-h-[120px] lg:min-h-[160px] whitespace-pre-wrap transition-all leading-relaxed font-bold ${row.aiSuggestion ? 'bg-indigo-50/50 border border-indigo-100 text-indigo-900 italic shadow-xl shadow-indigo-500/10' : 'bg-slate-50/30 border border-dashed border-slate-200 text-slate-200 flex items-center justify-center font-black text-[10px] uppercase tracking-widest opacity-50'}`}>
-                                {row.aiSuggestion || (rowLoading[row.key] ? 
-                                  <div>"Awaiting AI"<div className="w-10 h-10 centered relative">
+                              <div 
+                                className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] min-h-[120px] lg:min-h-[160px] whitespace-pre-wrap transition-all leading-relaxed font-bold ${
+                                  row.aiSuggestion && !rowAiLoading[row.key] 
+                                  ? 'bg-indigo-50/50 border border-indigo-100 text-indigo-900 italic shadow-xl shadow-indigo-500/10'
+                                  : row.aiSuggestion && rowAiLoading[row.key] 
+                                    ? 'bg-slate-50/50 border border-slate-100 text-indigo-900 italic shadow-xl shadow-slate-500/10'
+                                    : 'bg-slate-50/30 border border-dashed border-slate-200 text-slate-200 flex items-center justify-center font-black text-[10px] uppercase tracking-widest opacity-50'}`}
+                              >
+                                {row.aiSuggestion && !rowAiLoading[row.key]  ? row.aiSuggestion : (row.aiSuggestion && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="w-2 h-2 centered relative">
                                     <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
                                     <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                  </div></div> : "No AI")}
+                                  </div></div> : (rowAiLoading[row.key] ? 
+                                  <div>Awaiting AI<div className="w-10 h-10 centered relative">
+                                    <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
+                                    <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                  </div></div> : "No AI"))}
                               </div>
-                              {row.aiSuggestion ? (
+                              {row.aiSuggestion && !rowAiLoading[row.key] ? (
                                 <div>
                                   <button 
                                     onClick={() => {
@@ -612,7 +651,7 @@ const App: React.FC = () => {
                                   </button>
                                 </div>
                               ) : (
-                                <button 
+                                rowAiLoading[row.key] || <button 
                                   onClick={async () => {
                                     const updatedRows = [...activeProject.rows];
 
@@ -622,14 +661,14 @@ const App: React.FC = () => {
                                       return;
                                     }
                                     try {
-                                      setRowLoading({...rowLoading, [row.key]: true});
+                                      setRowAiLoading({...rowAiLoading, [row.key]: true});
                                       const suggestions = await getTranslationSuggestions(
                                         activeProject.selectedModel, settings.geminiApiKey,
                                         activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
                                         activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
                                         [{ key: row.key, value: row.sourceValue }]
                                       );
-                                      setRowLoading({...rowLoading, [row.key]: false});
+                                      setRowAiLoading({...rowAiLoading, [row.key]: false});
                                       Object.keys(suggestions).forEach(key => {
                                         const rowIndex = updatedRows.findIndex(r => r.key === key);
                                         if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
