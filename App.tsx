@@ -139,7 +139,7 @@ const App: React.FC = () => {
         return ({
           key,
           sourceValue: flatSource[key].toString(),
-          targetValue: (activeProject ? row?.targetValue === row?.originalTargetValue : true) ? (flatTarget[key] ? flatTarget[key].toString() : '') : row?.targetValue || '',
+          targetValue: (activeProject ? row?.targetValue === row?.originalTargetValue : true) ? (flatTarget[key] ? flatTarget[key].toString() : flatSource[key].toString()) : row?.targetValue || '',
           originalTargetValue: flatTarget[key] ? flatTarget[key].toString() : flatSource[key].toString(),
           aiSuggestion: row ? (row.aiSuggestion || '') : '',
         });
