@@ -247,7 +247,7 @@ const App: React.FC = () => {
 
   const filteredRows = activeProject?.rows?.filter?.(r => 
     searchTerms.toLowerCase().split("||").some((searchTerm) => { 
-      const queryWithoutTag = searchTerm.toLowerCase().substring(0, searchTerms.includes("#") ? searchTerms.indexOf("#") : searchTerms.length).trim();
+      const queryWithoutTag = searchTerm.toLowerCase().substring(0, searchTerm.includes("#") ? searchTerm.indexOf("#") : searchTerm.length).trim();
       return ((!searchTerm.includes("#reg") ? (
         r.key.toLowerCase().includes(queryWithoutTag) || 
         (!searchTerm.includes("#key")) && (
