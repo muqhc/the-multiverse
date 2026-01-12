@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const [editNameValue, setEditNameValue] = useState('');
   const [showDialogSuggestAll, setShowDialogSuggestAll] = useState(false);
   const [additionalInstructions, setAdditionalInstructions] = useState('');
+  const [replaceExistAISuggestions, setReplaceExistAISuggestions] = useState(false);
 
   // Load from Browser Storage
   useEffect(() => {
@@ -164,8 +165,8 @@ const App: React.FC = () => {
     }
 
     try {
-      const chunkSize = 10;
-      const updatedRows = [...filteredRows].filter(r => (r.aiSuggestion === undefined || r.aiSuggestion === '' ) && !rowAiLoading[r.key]);
+      const chunkSize = settings.suggestionChunkSize || 10;
+      const updatedRows = [...filteredRows].filter(r => (replaceExistAISuggestions || (r.aiSuggestion === undefined || r.aiSuggestion === '')) && !rowAiLoading[r.key]);
       const newRows = [...activeProject.rows]
       
       let newRowLoading = {...rowAiLoading};
@@ -198,7 +199,7 @@ const App: React.FC = () => {
       setRowAiLoading({...rowAiLoading, ...newRowLoading});
       updateActiveProject({ rows: newRows });
       let updatedAiTemp = {...rowAiTemp};
-      updatedRows.forEach(r => { delete updatedAiTemp[r.key]; });
+      updatedRows.forEach(r => { updatedAiTemp[r.key] = undefined; });
       setRowAiTemp(updatedAiTemp);
     } catch (err: any) {
       alert(`AI Engine Error: ${err.message}. Try re-authenticating your Gemini Key in Settings.`);
@@ -618,11 +619,11 @@ const App: React.FC = () => {
                                 className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] min-h-[120px] lg:min-h-[160px] whitespace-pre-wrap transition-all leading-relaxed font-bold ${
                                   row.aiSuggestion && !rowAiLoading[row.key] 
                                   ? 'bg-indigo-50/50 border border-indigo-100 text-indigo-900 italic shadow-xl shadow-indigo-500/10'
-                                  : row.aiSuggestion && rowAiLoading[row.key] 
+                                  : rowAiTemp[row.key] && rowAiLoading[row.key] 
                                     ? 'bg-slate-50/50 border border-slate-100 text-indigo-900 italic shadow-xl shadow-slate-500/10'
                                     : 'bg-slate-50/30 border border-dashed border-slate-200 text-slate-200 flex items-center justify-center font-black text-[10px] uppercase tracking-widest opacity-50'}`}
                               >
-                                {row.aiSuggestion && !rowAiLoading[row.key]  ? row.aiSuggestion : (row.aiSuggestion && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="w-2 h-2 centered relative">
+                                {row.aiSuggestion && !rowAiLoading[row.key]  ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="w-2 h-2 centered relative">
                                     <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
                                     <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                                   </div></div> : (rowAiLoading[row.key] ? 
@@ -816,6 +817,17 @@ const App: React.FC = () => {
                       value={additionalInstructions}
                       onChange={e => setAdditionalInstructions(e.target.value)}
                     />
+                  </section>
+                  <section>
+                    <button 
+                      className={`w-full p-3 lg:p-4 ${replaceExistAISuggestions ? "text-amber-500 shadow-inner bg-amber-50" : "text-slate-400 drop-shadow-lg bg-amber-50"} shadow-slate-500/20 border border-amber-500 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all cursor-pointer items-center justify-item-start flex gap-3`}
+                      onClick={() => setReplaceExistAISuggestions(!replaceExistAISuggestions)}
+                    >
+                      <div className="w-6 h-6 lg:w-7 lg:h-7 items-center justify-center rounded-[0.5rem] bg-auto outline-dashed outline-2">
+                        {replaceExistAISuggestions && <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      </div>
+                      <div className="text-[12px] font-black uppercase tracking-widest">Replace Existing AI Suggestions</div>
+                    </button>
                   </section>
                 </div>
 
