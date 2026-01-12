@@ -382,31 +382,31 @@ const App: React.FC = () => {
                 </div>
               </div>
               
-              <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                <div className="flex gap-2 w-full lg:w-auto">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex gap-2">
                   <button
                     onClick={handleCopyRawJson}
                     title="Export JSON"
-                    className="flex-1 lg:flex-none p-3.5 lg:p-4 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-2xl border border-slate-100 flex items-center justify-center transition-all"
+                    className="flex-none p-3.5 lg:p-4 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-2xl border border-slate-100 flex items-center justify-center transition-all"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
                   </button>
                   <button
                     onClick={e => {setShowDialogSuggestAll(true);}}
                     disabled={loading || activeProject.rows.length === 0}
-                    className="flex-1 lg:flex-none px-6 lg:px-8 py-3.5 lg:py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-3 text-sm font-black disabled:opacity-50 transition-all active:scale-95"
+                    className="flex-none p-3.5 lg:px-8 lg:py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-3 text-sm font-black disabled:opacity-50 transition-all active:scale-95"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                    AI Suggest
+                    <div className="max-xl:hidden">AI Suggest</div>
                   </button>
                 </div>
                 <button
                   onClick={handlePushToGitHub}
                   disabled={loading || modifiedCount === 0 || !settings.githubToken}
-                  className="flex-1 lg:flex-none px-6 lg:px-8 py-3.5 lg:py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3 text-sm font-black disabled:opacity-50 transition-all active:scale-95"
+                  className="flex-none p-3.5 lg:px-8 lg:py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3 text-sm font-black disabled:opacity-50 transition-all active:scale-95"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                  Push
+                  <div className="max-xl:hidden">Push</div>
                 </button>
                 <button 
                   onClick={() => setShowConfig(!showConfig)}
@@ -820,7 +820,7 @@ const App: React.FC = () => {
                   </section>
                   <section>
                     <button 
-                      className={`w-full p-3 lg:p-4 ${replaceExistAISuggestions ? "text-amber-500 shadow-inner bg-amber-50" : "text-slate-400 drop-shadow-lg bg-amber-50"} shadow-slate-500/20 border border-amber-500 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all cursor-pointer items-center justify-item-start flex gap-3`}
+                      className={`w-full p-3 lg:p-4 ${replaceExistAISuggestions ? "text-amber-600 shadow-inner" : "text-slate-400 drop-shadow-lg"} bg-amber-50 hover:bg-amber-100 shadow-slate-500/20 border border-amber-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all cursor-pointer items-center justify-item-start flex gap-3`}
                       onClick={() => setReplaceExistAISuggestions(!replaceExistAISuggestions)}
                     >
                       <div className="w-6 h-6 lg:w-7 lg:h-7 items-center justify-center rounded-[0.5rem] bg-auto outline-dashed outline-2">
