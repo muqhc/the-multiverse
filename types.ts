@@ -12,6 +12,7 @@ export interface TranslationRow {
   sourceValue: string;
   targetValue: string;
   originalTargetValue: string;
+  pastSourceValue: string;
   aiSuggestion?: string;
 }
 

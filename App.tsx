@@ -47,6 +47,7 @@ const App: React.FC<AppProps> = (props) => {
     if (projectLoadQueue.length > 0) {
       setProjects(prev => [...prev, ...projectLoadQueue.filter(p => !prev.some(x => x.id === p.id))]);
       setActiveProjectId(projectLoadQueue[0].id);
+      setProjects([]);
     }
   }, []);
 
@@ -179,12 +180,15 @@ const App: React.FC<AppProps> = (props) => {
         return typeof flatSource[key] === 'string';
       }).map(key => {
         let row = activeProject?.rows.filter(r => r.key === key)[0];
+        const targetValue = (activeProject ? row?.targetValue === row?.originalTargetValue : true) ? (flatTarget[key] ? flatTarget[key].toString() : flatSource[key].toString()) : row?.targetValue || ''
+        const sourceValue = flatSource[key].toString();
         return ({
-          key,
-          sourceValue: flatSource[key].toString(),
-          targetValue: (activeProject ? row?.targetValue === row?.originalTargetValue : true) ? (flatTarget[key] ? flatTarget[key].toString() : flatSource[key].toString()) : row?.targetValue || '',
+          key: key,
+          sourceValue: sourceValue,
+          targetValue: targetValue,
           originalTargetValue: flatTarget[key] ? flatTarget[key].toString() : flatSource[key].toString(),
           aiSuggestion: row ? (row.aiSuggestion || '') : '',
+          pastSourceValue: row ? (row.pastSourceValue || '') : '',
         });
       });
 
@@ -316,21 +320,23 @@ const App: React.FC<AppProps> = (props) => {
             new RegExp(queryWithoutTag).test(r.targetValue.toLowerCase())))
         )) &&
         (
-          ((!searchTerm.includes("#modified")) || r.targetValue !== r.originalTargetValue) &&
-          ((!searchTerm.includes("#done")) || r.sourceValue !== r.originalTargetValue && r.targetValue === r.originalTargetValue) &&
-          ((!searchTerm.includes("#undone")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '') &&
-          ((!searchTerm.includes("#doing")) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '' || r.targetValue !== r.originalTargetValue) &&
-          ((!searchTerm.includes("#ai")) || (r.aiSuggestion && r.aiSuggestion !== '')) &&
-          ((!searchTerm.includes("#noai")) || (!r.aiSuggestion || r.aiSuggestion === '' || !rowAiLoading[r.key])) &&
-          ((!searchTerm.includes("#empty")) || (!r.targetValue || r.targetValue === '')) &&
-          ((!searchTerm.includes("#inarray")) || (/^.*\.\d+$/).test(r.key)) &&
-          ((!searchTerm.includes("#aifetching")) || (rowAiLoading[r.key] === true))
+          ((!(searchTerm.includes("#modified") || searchTerm.includes("#mod"))) || r.targetValue !== r.originalTargetValue) &&
+          ((!(searchTerm.includes("#unconfirmed") || searchTerm.includes("#unc"))) || r.sourceValue !== r.pastSourceValue) &&
+          ((!(searchTerm.includes("#done") || searchTerm.includes("#don"))) || r.sourceValue !== r.originalTargetValue && r.targetValue === r.originalTargetValue) &&
+          ((!(searchTerm.includes("#undone") || searchTerm.includes("#und"))) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '') &&
+          ((!(searchTerm.includes("#doing") || searchTerm.includes("#doi"))) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '' || r.targetValue !== r.originalTargetValue) &&
+          ((!(searchTerm.includes("#ai") || searchTerm.includes("#ai"))) || (r.aiSuggestion && r.aiSuggestion !== '')) &&
+          ((!(searchTerm.includes("#noai") || searchTerm.includes("#noa"))) || (!r.aiSuggestion || r.aiSuggestion === '' || !rowAiLoading[r.key])) &&
+          ((!(searchTerm.includes("#empty") || searchTerm.includes("#emp"))) || (!r.targetValue || r.targetValue === '')) &&
+          ((!(searchTerm.includes("#inarray") || searchTerm.includes("#ina"))) || (/^.*\.\d+$/).test(r.key)) &&
+          ((!(searchTerm.includes("#aifetching") || searchTerm.includes("#aif"))) || (rowAiLoading[r.key] === true))
         )
       )
     })
   ) || [];
 
   const modifiedCount = activeProject?.rows.filter(r => r.targetValue !== r.originalTargetValue).length || 0;
+  const unconfirmedCount = activeProject?.rows.filter(r => r.sourceValue !== r.pastSourceValue).length || 0;
 
   return (
     <div className="flex h-screen bg-white overflow-hidden text-slate-900 font-sans selection:bg-indigo-100">
@@ -376,9 +382,14 @@ const App: React.FC<AppProps> = (props) => {
             >
               <div className="flex justify-between items-center w-full">
                 <span className="font-bold truncate text-sm">{p.name}</span>
-                {p.rows.some(r => r.targetValue !== r.originalTargetValue) && (
-                  <span className="w-2.5 h-2.5 bg-amber-400 rounded-full shadow-[0_0_12px_rgba(251,191,36,0.6)] animate-pulse" />
-                )}
+                <div className="flex gap-1">
+                  {p.rows.some(r => r.targetValue !== r.originalTargetValue) && (
+                    <span className="w-2.5 h-2.5 bg-amber-400 rounded-full shadow-[0_0_12px_rgba(251,191,36,0.6)] animate-pulse" />
+                  )}
+                  {p.rows.some(r => r.sourceValue !== r.pastSourceValue) && (
+                    <span className="w-2.5 h-2.5 bg-rose-400 rounded-full shadow-[0_0_12px_rgba(251,18,36,0.6)] animate-pulse" />
+                  )}
+                </div>
               </div>
               <span className="text-[10px] font-mono opacity-30 mt-2 uppercase tracking-widest">{p.rows.length || 0} strings manifested</span>
             </button>
@@ -427,7 +438,9 @@ const App: React.FC<AppProps> = (props) => {
                   </div>
                 ) : (
                   <div className="group flex items-center gap-4">
-                    <h2 onClick={() => setIsEditingName(true)} className="font-black text-2xl lg:text-4xl text-slate-900 tracking-tighter leading-none cursor-pointer hover:text-indigo-600 transition-colors">{activeProject.name}</h2>
+                    <h2 onClick={() => setIsEditingName(true)} className="font-black text-2xl lg:text-4xl text-slate-900 tracking-tighter leading-none cursor-pointer hover:text-indigo-600 transition-colors">
+                      {activeProject.name}
+                    </h2>
                     <button
                       onClick={() => setIsEditingName(true)}
                       className="p-2 text-slate-300 hover:text-indigo-500 transition-colors lg:opacity-0 lg:group-hover:opacity-100 bg-slate-50 rounded-xl"
@@ -594,8 +607,8 @@ const App: React.FC<AppProps> = (props) => {
             )}
 
             <div style={{ height: "100%" }} className="flex-1 overflow-hidden flex flex-col bg-slate-50/20">
-              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 sticky top-0 z-20">
-                <div className="relative w-full lg:max-w-4xl">
+              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white border-b border-slate-100 flex flex-col sm:flex-row items-center justify-start gap-4 sticky top-0 z-20">
+                <div className="relative w-full max-w-4xl">
                   <input
                     type="text"
                     placeholder="Search strings, keys, or translations..."
@@ -644,15 +657,16 @@ const App: React.FC<AppProps> = (props) => {
                         </div>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-6 pt-4 border-t border-slate-50">
                           {[
-                            { tag: "#modified", desc: "Show pending changes" },
-                            { tag: "#empty", desc: "Missing translations" },
-                            { tag: "#done", desc: "Manifest matching remote" },
-                            { tag: "#undone", desc: "Undisturbed strings" },
-                            { tag: "#doing", desc: "Active work batch" },
+                            { tag: "#modified, #mod", desc: "Show modified rows" },
+                            { tag: "#unconfirmed, #unc", desc: "Show unconfirmed rows" },
+                            { tag: "#empty, #emp", desc: "Missing translations" },
+                            { tag: "#done, #don", desc: "Manifest matching remote" },
+                            { tag: "#undone, #und", desc: "Undisturbed strings" },
+                            { tag: "#doing, #doi", desc: "Active work batch" },
                             { tag: "#ai", desc: "AI suggestions present" },
-                            { tag: "#noai", desc: "No AI data yet" },
-                            { tag: "#aifetching", desc: "Awaiting AI core" },
-                            { tag: "#inarray", desc: "Manifest arrays" }
+                            { tag: "#noai, #noa", desc: "No AI data yet" },
+                            { tag: "#aifetching, #aif", desc: "Awaiting AI core" },
+                            { tag: "#inarray, #ina", desc: "Manifest arrays" }
                           ].map(item => (
                             <div key={item.tag} className="space-y-1">
                               <code className="text-indigo-600 font-black text-xs">{item.tag}</code>
@@ -664,10 +678,11 @@ const App: React.FC<AppProps> = (props) => {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap overflow-x-auto no-scrollbar">
-                  {modifiedCount > 0 && <span className="text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 shadow-sm">{modifiedCount} Pending Changes</span>}
+                <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap no-scrollbar">
+                  {unconfirmedCount > 0 && <span className="text-rose-600 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 shadow-sm">{unconfirmedCount} Unconfirmed</span>}
+                  {modifiedCount > 0 && <span className="text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 shadow-sm">{modifiedCount} Modified</span>}
                   <span className="hidden sm:inline w-1 h-1 bg-slate-200 rounded-full"></span>
-                  <span>{filteredRows.length} Localized Entries</span>
+                  <span>{filteredRows.length} Entries</span>
                 </div>
               </div>
 
@@ -712,13 +727,29 @@ const App: React.FC<AppProps> = (props) => {
                             </div>
 
                             {/* Source Column */}
-                            <div className="w-full">
+                            <div className="w-full relative group" title={`${row.sourceValue}/${row.pastSourceValue}`}>
                               <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Source String</label>
-                              <div className="text-sm lg:text-sm p-5 lg:p-7 bg-slate-50/50 rounded-2xl lg:rounded-[2.5rem] border border-slate-100/50 whitespace-pre-wrap text-slate-700 leading-relaxed font-black shadow-inner">{row.sourceValue}</div>
+                              <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border ${row.pastSourceValue !== row.sourceValue ? 'border-rose-300 ring-8 ring-rose-500/5 bg-rose-500/5' : 'border-slate-100/50 shadow-inner'} whitespace-pre-wrap text-slate-700 leading-relaxed font-black`}>
+                                {row.sourceValue}
+                                {row.pastSourceValue !== row.sourceValue && (<>
+                                  <span className="absolute -top-3 -right-3 max-lg:hidden group-hover:hidden bg-rose-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">
+                                    Unconfirm
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
+                                      updateActiveProject({ rows: newRows });
+                                    }}
+                                    className="absolute -top-3 -right-3 lg:hidden group-hover:block bg-lime-500 text-[9px] lg:text-[10px] font-black text-white px-10 py-1.5 rounded-full border-4 border-white uppercase whitespace-nowrap shadow-2xl"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                  </button>
+                                </>)}
+                              </div>
                             </div>
 
                             {/* Target Column */}
-                            <div className="w-full relative">
+                            <div className="w-full relative group">
                               <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
                               <textarea
                                 className={`w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black ${row.targetValue !== row.originalTargetValue ? 'border-amber-300 ring-8 ring-amber-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}`}
@@ -776,7 +807,7 @@ const App: React.FC<AppProps> = (props) => {
                                     }}
                                     className="absolute top-3 right-20 lg:top-6 lg:right-17 bg-white text-rose-600 font-black p-2 lg:p-3 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-rose-50 active:scale-75 hover:bg-rose-50"
                                   >
-                                    <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
+                                    <svg className="w-5 h-5 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
                                   </button>
                                   <button
                                     onClick={() => {
