@@ -727,7 +727,7 @@ const App: React.FC<AppProps> = (props) => {
                             </div>
 
                             {/* Source Column */}
-                            <div className="w-full relative group" title={`${row.sourceValue}/${row.pastSourceValue}`}>
+                            <div className="w-full relative group">
                               <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Source String</label>
                               <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border ${row.pastSourceValue !== row.sourceValue ? 'border-rose-300 ring-8 ring-rose-500/5 bg-rose-500/5' : 'border-slate-100/50 shadow-inner'} whitespace-pre-wrap text-slate-700 leading-relaxed font-black`}>
                                 {row.sourceValue}
