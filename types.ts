@@ -17,6 +17,8 @@ export interface TranslationRow {
 }
 
 export enum GeminiModel {
+  'GA4-26B-A4B-IT' = 'gemma-4-26b-a4b-it',
+  'GA4-31B-IT' = 'gemma-4-31b-it',
   'G3-FLASH-PRE' = 'gemini-3-flash-preview',
   'G3-PRO-PRE' = 'gemini-3-pro-preview',
   'G2.5-FLASH' = 'gemini-2.5-flash',
