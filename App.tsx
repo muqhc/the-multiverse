@@ -73,7 +73,7 @@ const App: React.FC<AppProps> = (props) => {
       name,
       config: { owner: '', repo: '', branch: 'main', sourcePath: '', targetPath: '' },
       rows: [],
-      selectedModel: GeminiModel['G3-FLASH-PRE'],
+      selectedModel: Object.values(GeminiModel)[0],
       lastUpdated: Date.now(),
       originalTargetData: {},
     };
