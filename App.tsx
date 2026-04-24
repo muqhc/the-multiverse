@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { GitHubConfig, TranslationRow, GeminiModel, Project, GlobalState, GlobalSettings, ValueType } from './types';
+import { GitHubConfig, TranslationRow, GeminiModel, Project, GlobalState, GlobalSettings, ValueType, ViewMode, DiffRowState, Diff, DiffRow } from './types';
 import { flattenObject, unflattenObject, saveToLocal, loadFromLocal, downloadFile, importProject as importProjectFromText } from './utils';
 import { GitHubService } from './services/githubService';
 import { getTranslationSuggestions } from './services/geminiService';
@@ -30,6 +30,9 @@ const App: React.FC<AppProps> = (props) => {
   const [additionalInstructions, setAdditionalInstructions] = useState('');
   const [replaceExistAISuggestions, setReplaceExistAISuggestions] = useState(false);
   const [showSearchHelp, setShowSearchHelp] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.TRANSLATIONS);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [driftDiff, setDriftDiff] = useState<Diff | null>(null);
 
   // Load from Browser Storage
   useEffect(() => {
@@ -76,6 +79,8 @@ const App: React.FC<AppProps> = (props) => {
       selectedModel: Object.values(GeminiModel)[0],
       lastUpdated: Date.now(),
       originalTargetData: {},
+      note: '',
+      diffStack: [],
     };
   }
 
@@ -160,6 +165,17 @@ const App: React.FC<AppProps> = (props) => {
     setProjects(prev => prev.map(p => p.id === activeProjectId ? { ...p, ...updates, lastUpdated: Date.now() } : p));
   };
 
+  const confirmAllUnconfirmed = () => {
+    if (!activeProject) return;
+    if (!confirm(`Are you sure you want to confirm all unconfirmed translations?`)) return;
+    const updatedRows = [...activeProject.rows];
+    updatedRows.forEach(r => {
+      if (r.sourceValue !== r.pastSourceValue) r.pastSourceValue = r.sourceValue;
+    });
+    updateActiveProject({ rows: updatedRows });
+  };
+  window["_MULTIVERSE_CONFIRM_ALL_UNCONFIRMED"] = confirmAllUnconfirmed;
+
   const handleFetchFiles = async () => {
     if (!activeProject?.config.owner || !activeProject?.config.repo || !activeProject?.config.sourcePath) {
       alert("⚠️ Configuration Incomplete\nPlease provide the Repository Owner, Name, and Source/Target paths in Project Settings.");
@@ -175,29 +191,103 @@ const App: React.FC<AppProps> = (props) => {
       const flatSource = flattenObject(source);
       const flatTarget = flattenObject(target);
 
-      const newRows: TranslationRow[] = Object.keys(flatSource).filter(key => {
-        let row = activeProject?.rows.filter(r => r.key === key)[0];
-        return typeof flatSource[key] === 'string';
-      }).map(key => {
-        let row = activeProject?.rows.filter(r => r.key === key)[0];
-        const targetValue = (activeProject ? row?.targetValue === row?.originalTargetValue : true) ? (flatTarget[key] ? flatTarget[key].toString() : flatSource[key].toString()) : row?.targetValue || ''
-        const sourceValue = flatSource[key].toString();
-        return ({
-          key: key,
-          sourceValue: sourceValue,
-          targetValue: targetValue,
-          originalTargetValue: flatTarget[key] ? flatTarget[key].toString() : flatSource[key].toString(),
-          aiSuggestion: row ? (row.aiSuggestion || '') : '',
-          pastSourceValue: row ? (row.pastSourceValue || '') : '',
-        });
+      const diff: Diff = { rows: [], originalFlatSource: flatSource, originalFlatTarget: flatTarget };
+      const currentRows = activeProject ? activeProject.rows : [];
+
+      Object.keys(flatSource).forEach(key => {
+        if (typeof flatSource[key] !== 'string') return;
+
+        const sourceVal = flatSource[key].toString();
+        const existingRow = currentRows.find(r => r.key === key);
+        const targetValFromTarget = flatTarget[key] ? flatTarget[key].toString() : sourceVal;
+
+        if (!existingRow) {
+          diff.rows.push({
+            key,
+            sourceValue: '',
+            updatedSourceValue: sourceVal,
+            targetValue: '',
+            originalTargetValue: targetValFromTarget,
+            pastSourceValue: '',
+            state: DiffRowState.ADDED
+          });
+        } else if (existingRow.sourceValue !== sourceVal) {
+          diff.rows.push({
+            ...existingRow,
+            updatedSourceValue: sourceVal,
+            originalTargetValue: targetValFromTarget, // update originalTargetValue as well? Usually yes.
+            state: DiffRowState.MODIFIED
+          });
+        }
       });
 
-      updateActiveProject({ rows: newRows, originalTargetData: target });
+      currentRows.forEach(row => {
+        if (!(row.key in flatSource) || typeof flatSource[row.key] !== 'string') {
+          diff.rows.push({
+            ...row,
+            updatedSourceValue: '',
+            state: DiffRowState.REMOVED
+          });
+        }
+      });
+
+      setDriftDiff(diff);
+      setIsConfirming(true);
+      setViewMode(ViewMode.DIFFERENCES);
+      updateActiveProject({ originalTargetData: target });
       setShowConfig(false);
     } catch (err: any) {
       alert(`GitHub Sync Failed: ${err.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmAll = () => {
+    if (!activeProject || !driftDiff) return;
+
+    let newRows = [...activeProject.rows];
+
+    driftDiff.rows.forEach(diffRow => {
+      if (diffRow.state === DiffRowState.ADDED) {
+        newRows.push({
+          key: diffRow.key,
+          sourceValue: diffRow.updatedSourceValue,
+          targetValue: diffRow.targetValue,
+          originalTargetValue: diffRow.originalTargetValue,
+          pastSourceValue: diffRow.pastSourceValue,
+          aiSuggestion: diffRow.aiSuggestion,
+        });
+      } else if (diffRow.state === DiffRowState.MODIFIED) {
+        const index = newRows.findIndex(r => r.key === diffRow.key);
+        if (index !== -1) {
+          newRows[index] = {
+            ...newRows[index],
+            sourceValue: diffRow.updatedSourceValue,
+            originalTargetValue: diffRow.originalTargetValue,
+          };
+        }
+      } else if (diffRow.state === DiffRowState.REMOVED) {
+        newRows = newRows.filter(r => r.key !== diffRow.key);
+      }
+    });
+
+    const orderedKeys = Object.keys(driftDiff.originalFlatSource).filter(key => typeof driftDiff.originalFlatSource[key] === 'string');
+    const rowMap = new Map(newRows.map(r => [r.key, r]));
+    const orderedRows = orderedKeys.map(key => rowMap.get(key));
+
+    const newDiffStack = [...(activeProject.diffStack || []), driftDiff];
+
+    updateActiveProject({ rows: orderedRows, diffStack: newDiffStack });
+    setIsConfirming(false);
+    setDriftDiff(null);
+    setViewMode(ViewMode.TRANSLATIONS);
+  };
+
+  const handleClearDiffStack = () => {
+    if (!activeProject) return;
+    if (confirm("Clear all past difference history?")) {
+      updateActiveProject({ diffStack: [] });
     }
   };
 
@@ -226,12 +316,13 @@ const App: React.FC<AppProps> = (props) => {
           return ({ key: r.key, value: r.sourceValue });
         });
 
+        const combinedInstructions = [activeProject.note?.replace("\n", ", "), additionalInstructions].filter(Boolean).join(", ");
         const suggestions = await getTranslationSuggestions(
           activeProject.selectedModel, settings.geminiApiKey,
           activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
           activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
           sourceTexts,
-          additionalInstructions
+          combinedInstructions
         );
         chunk.forEach(r => { newRowLoading[r.key] = false; });
 
@@ -337,6 +428,41 @@ const App: React.FC<AppProps> = (props) => {
 
   const modifiedCount = activeProject?.rows.filter(r => r.targetValue !== r.originalTargetValue).length || 0;
   const unconfirmedCount = activeProject?.rows.filter(r => r.sourceValue !== r.pastSourceValue).length || 0;
+  const activeDiff: Diff = isConfirming ? driftDiff : (activeProject?.diffStack?.length ? activeProject.diffStack[activeProject.diffStack.length - 1] : { rows: [], originalFlatSource: {}, originalFlatTarget: {} });
+
+  const filteredDiffRows = activeDiff.rows.filter(r =>
+    searchTerms.toLowerCase().split("||").some((searchTerm) => {
+      const queryWithoutTag = searchTerm.toLowerCase().substring(0, searchTerm.includes("#") ? searchTerm.indexOf("#") : searchTerm.length).trim();
+      return ((!searchTerm.includes("#reg") ? (
+        r.key.toLowerCase().includes(queryWithoutTag) ||
+        (!searchTerm.includes("#key")) && (
+          r.sourceValue.toLowerCase().includes(queryWithoutTag) ||
+          r.targetValue.toLowerCase().includes(queryWithoutTag)))
+        :
+        (searchTerm.includes("#reg") && (
+          new RegExp(queryWithoutTag).test(r.key.toLowerCase()) ||
+          (!searchTerm.includes("#key")) && (
+            new RegExp(queryWithoutTag).test(r.sourceValue.toLowerCase()) ||
+            new RegExp(queryWithoutTag).test(r.targetValue.toLowerCase())))
+        )) &&
+        (
+          ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || r.state === DiffRowState.MODIFIED) &&
+          ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || r.state === DiffRowState.ADDED) &&
+          ((!(searchTerm.includes("#dremoved") || searchTerm.includes("#drem"))) || r.state === DiffRowState.REMOVED) &&
+          ((!(searchTerm.includes("#modified") || searchTerm.includes("#mod"))) || r.targetValue !== r.originalTargetValue) &&
+          ((!(searchTerm.includes("#unconfirmed") || searchTerm.includes("#unc"))) || r.sourceValue !== r.pastSourceValue) &&
+          ((!(searchTerm.includes("#done") || searchTerm.includes("#don"))) || r.sourceValue !== r.originalTargetValue && r.targetValue === r.originalTargetValue) &&
+          ((!(searchTerm.includes("#undone") || searchTerm.includes("#und"))) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '') &&
+          ((!(searchTerm.includes("#doing") || searchTerm.includes("#doi"))) || r.sourceValue === r.targetValue || !r.targetValue || r.targetValue == '' || r.targetValue !== r.originalTargetValue) &&
+          ((!(searchTerm.includes("#ai") || searchTerm.includes("#ai"))) || (r.aiSuggestion && r.aiSuggestion !== '')) &&
+          ((!(searchTerm.includes("#noai") || searchTerm.includes("#noa"))) || (!r.aiSuggestion || r.aiSuggestion === '' || !rowAiLoading[r.key])) &&
+          ((!(searchTerm.includes("#empty") || searchTerm.includes("#emp"))) || (!r.targetValue || r.targetValue === '')) &&
+          ((!(searchTerm.includes("#inarray") || searchTerm.includes("#ina"))) || (/^.*\.\d+$/).test(r.key)) &&
+          ((!(searchTerm.includes("#aifetching") || searchTerm.includes("#aif"))) || (rowAiLoading[r.key] === true))
+        )
+      )
+    })
+  ) || [];
 
   return (
     <div className="flex h-screen bg-white overflow-hidden text-slate-900 font-sans selection:bg-indigo-100">
@@ -546,7 +672,7 @@ const App: React.FC<AppProps> = (props) => {
                         onChange={e => updateActiveProject({ selectedModel: e.target.value as GeminiModel })}
                       >
                         {Object.values(GeminiModel).map(model => (
-                          <option value={model} title={model.startsWith("gemma") ? "Gemma<=3 is not support json mime (unstable)" : ""}>
+                          <option key={model} value={model} title={model.startsWith("gemma") ? "Gemma<=3 is not support json mime (unstable)" : ""}>
                             {model} {model.startsWith("gemma") ? "(unstable)" : ""}
                           </option>
                         ))}
@@ -595,12 +721,15 @@ const App: React.FC<AppProps> = (props) => {
                         placeholder="locales/ko.json"
                       />
                     </div>
-                    <div className="p-6 bg-slate-900 rounded-3xl border border-slate-800 flex items-start gap-4">
-                      <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center shrink-0 shadow-lg">
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                      </div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed font-bold italic">Manual manifest clearing: Updating paths resets the local progress buffer for that project. Sync from GitHub to re-populate.</p>
-                    </div>
+                  </div>
+                  <div className="space-y-2 mt-8">
+                    <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Project Note</label>
+                    <textarea
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all min-h-[100px]"
+                      value={activeProject.note || ''}
+                      onChange={e => updateActiveProject({ note: e.target.value })}
+                      placeholder="Context for translators"
+                    />
                   </div>
                 </div>
               </div>
@@ -657,6 +786,11 @@ const App: React.FC<AppProps> = (props) => {
                         </div>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-6 pt-4 border-t border-slate-50">
                           {[
+                            ...(viewMode === ViewMode.DIFFERENCES ? [
+                              { tag: "#dmodified, #dmod", desc: "Show modified rows in diff" },
+                              { tag: "#dadded, #dadd", desc: "Show added rows in diff" },
+                              { tag: "#dremoved, #drem", desc: "Show removed rows in diff" },
+                            ] : []),
                             { tag: "#modified, #mod", desc: "Show modified rows" },
                             { tag: "#unconfirmed, #unc", desc: "Show unconfirmed rows" },
                             { tag: "#empty, #emp", desc: "Missing translations" },
@@ -677,191 +811,281 @@ const App: React.FC<AppProps> = (props) => {
                       </div>
                     </div>
                   )}
+
+
                 </div>
                 <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap no-scrollbar">
                   {unconfirmedCount > 0 && <span className="text-rose-600 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 shadow-sm">{unconfirmedCount} Unconfirmed</span>}
                   {modifiedCount > 0 && <span className="text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 shadow-sm">{modifiedCount} Modified</span>}
                   <span className="hidden sm:inline w-1 h-1 bg-slate-200 rounded-full"></span>
-                  <span>{filteredRows.length} Entries</span>
+                  <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : activeDiff?.rows?.length || 0} Entries</span>
                 </div>
+
               </div>
 
-              <div style={{ height: "100%" }} className="flex-1 overflow-auto p-4 lg:p-12">
-                {filteredRows.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-                    <div className="w-24 h-24 bg-white rounded-[3rem] mb-6 flex items-center justify-center border border-slate-100 text-slate-100 shadow-sm">
-                      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                    </div>
-                    {
-                      activeProject.rows.length > 0
-                        ? <div>
-                          <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">No Search Results</p>
-                          <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Try different search terms.</p>
-                        </div>
-                        : <div>
-                          <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">Manifest Empty</p>
-                          <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Fetch files from your repository to start real-time localization.</p>
-                        </div>
-                    }
+              <div style={{ height: "100%" }} className="flex-1 overflow-auto px-4 lg:px-12">
+                {/* PROJECT CONSOLE */}
+                <div className="max-lg:absolute max-lg:top-6 max-lg:right-6">
+                  <div className="bg-white shadow-md shadow-slate-100 border border-slate-100 flex w-fit gap-2 p-1.5 rounded-2xl z-10 relative">
+                    {!isConfirming ? (
+                      <>
+                        <button onClick={() => setViewMode(ViewMode.TRANSLATIONS)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.TRANSLATIONS ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Translations</button>
+                        <button onClick={() => setViewMode(ViewMode.DIFFERENCES)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.DIFFERENCES ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Differences</button>
+                        {viewMode === ViewMode.DIFFERENCES && activeProject?.diffStack?.length ? (
+                          <button onClick={handleClearDiffStack} className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all ml-auto">Clear Diff History</button>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={handleConfirmAll} className="px-5 py-2 text-xs font-black rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all tracking-wide uppercase">Confirm All</button>
+                        <button onClick={() => { setIsConfirming(false); setDriftDiff(null); setViewMode(ViewMode.TRANSLATIONS); }} className="px-5 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase">Cancel</button>
+                      </>
+                    )}
                   </div>
-                ) : (
-                  <div style={{ height: "100%" }} className="space-y-6 lg:space-y-0 lg:bg-white lg:border lg:border-slate-200 lg:rounded-[3rem] lg:shadow-sm lg:overflow-hidden min-w-full">
-                    {/* Header for Desktop */}
-                    <div className="hidden lg:grid grid-cols-[320px_1fr_1fr_1fr] bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest p-8 sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
-                      <div>ENTRY PATH</div>
-                      <div>SOURCE STRING</div>
-                      <div>TARGET LOCALE</div>
-                      <div>AI SUGGESTION</div>
+                </div>
+                {viewMode === ViewMode.DIFFERENCES ? (
+                  (!activeDiff || activeDiff.rows.length === 0) ? (
+                    <div className="h-full flex flex-col items-center justify-center p-12 text-center">
+                      <div className="w-24 h-24 bg-white rounded-[3rem] mb-6 flex items-center justify-center border border-slate-100 text-slate-100 shadow-sm">
+                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      </div>
+                      <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">No Differences</p>
+                      <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Fetch files to check for drift or view past applied updates.</p>
                     </div>
-
-                    <div style={{ height: "100%" }} className="divide-y divide-slate-100 space-y-6 lg:space-y-0">
-                      <Virtuoso
-                        style={{ height: "100%" }}
-                        data={filteredRows}
-                        itemContent={(_, row) => (
-                          <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-[320px_1fr_1fr_1fr] gap-6 lg:gap-12 items-start transition-all ${row.targetValue !== row.originalTargetValue ? 'bg-amber-50/10 lg:bg-amber-50/10 border-amber-100' : 'hover:bg-slate-50/20'}`}>
-                            {/* Key Column */}
-                            <div className="w-full lg:w-auto overflow-hidden">
-                              <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
-                              <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key}</div>
-                            </div>
-
-                            {/* Source Column */}
-                            <div className="w-full relative group">
-                              <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Source String</label>
-                              <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border ${row.pastSourceValue !== row.sourceValue ? 'border-rose-300 ring-8 ring-rose-500/5 bg-rose-500/5' : 'border-slate-100/50 shadow-inner'} whitespace-pre-wrap text-slate-700 leading-relaxed font-black`}>
-                                {row.sourceValue}
-                                {row.pastSourceValue !== row.sourceValue && (<>
-                                  <span className="absolute -top-3 -right-3 max-lg:hidden group-hover:hidden bg-rose-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">
-                                    Unconfirm
-                                  </span>
-                                  <button
-                                    onClick={() => {
-                                      const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
-                                      updateActiveProject({ rows: newRows });
-                                    }}
-                                    className="absolute -top-3 -right-3 lg:hidden group-hover:block bg-lime-500 text-[9px] lg:text-[10px] font-black text-white px-10 py-1.5 rounded-full border-4 border-white uppercase whitespace-nowrap shadow-2xl"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                  </button>
-                                </>)}
+                  ) : (
+                    <div style={{ height: "100%" }} className="space-y-6 lg:space-y-0 lg:bg-white lg:border lg:border-slate-200 lg:rounded-[3rem] lg:shadow-sm lg:overflow-hidden min-w-full">
+                      <div className="hidden lg:grid grid-cols-[320px_1fr_1fr_1fr] bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest p-8 sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
+                        <div>ENTRY PATH</div>
+                        <div>CURRENT SOURCE VALUE</div>
+                        <div>UPDATED SOURCE VALUE</div>
+                        <div>TARGET LOCALE</div>
+                      </div>
+                      <div style={{ height: "100%" }} className="divide-y divide-slate-100 space-y-6 lg:space-y-0">
+                        <Virtuoso
+                          style={{ height: "80%" }}
+                          data={activeDiff.rows}
+                          itemContent={(_, row) => (
+                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-[320px_1fr_1fr_1fr] gap-6 lg:gap-12 items-start transition-all ${row.state === DiffRowState.ADDED ? 'bg-emerald-50/20' : row.state === DiffRowState.REMOVED ? 'bg-rose-50/20' : 'bg-amber-50/20'}`}>
+                              <div className="w-full lg:w-auto overflow-hidden">
+                                <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
+                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key} <span className={`uppercase font-black text-[9px] ml-2 px-2 py-0.5 rounded-full ${row.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : row.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{row.state}</span></div>
                               </div>
-                            </div>
-
-                            {/* Target Column */}
-                            <div className="w-full relative group">
-                              <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
-                              <textarea
-                                className={`w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black ${row.targetValue !== row.originalTargetValue ? 'border-amber-300 ring-8 ring-amber-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}`}
-                                value={row.targetValue}
-                                style={{ resize: 'none' }}
-                                onChange={e => {
-                                  const newRows = activeProject.rows.map(r => r.key === row.key ? {
-                                    ...r,
-                                    targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
-                                  } : r);
-                                  updateActiveProject({ rows: newRows });
-                                }}
-                                onKeyDown={e => {
-                                  if (e.key === 'Tab') {
-                                    e.preventDefault();
-                                    const newRows = activeProject.rows.map(r => r.key === row.key ? {
-                                      ...r,
-                                      targetValue: row.originalTargetValue
-                                    } : r);
-                                    updateActiveProject({ rows: newRows });
-                                  }
-                                }}
-                                placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
-                              />
-                              {row.targetValue !== row.originalTargetValue && (
-                                <span className="absolute -top-3 -right-3 bg-amber-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">Modified</span>
-                              )}
-                            </div>
-
-                            {/* AI Column */}
-                            <div className="w-full relative group">
-                              <label className="lg:hidden text-[9px] font-black text-purple-500 uppercase mb-3 block tracking-widest">AI Suggestion</label>
-                              <div
-                                className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] min-h-[120px] lg:min-h-[160px] whitespace-pre-wrap transition-all leading-relaxed font-bold ${row.aiSuggestion && !rowAiLoading[row.key]
-                                  ? 'bg-indigo-50/50 border border-indigo-100 text-indigo-900 italic shadow-xl shadow-indigo-500/10'
-                                  : rowAiTemp[row.key] && rowAiLoading[row.key]
-                                    ? 'bg-slate-50/50 border border-slate-100 text-indigo-900 italic shadow-xl shadow-slate-500/10'
-                                    : 'bg-slate-50/30 border border-dashed border-slate-200 text-slate-200 flex items-center justify-center font-black text-[10px] uppercase tracking-widest opacity-50'}`}
-                              >
-                                {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="w-2 h-2 centered relative">
-                                  <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
-                                  <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                </div></div> : (rowAiLoading[row.key] ?
-                                  <div>Awaiting AI<div className="w-10 h-10 centered relative">
-                                    <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
-                                    <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                  </div></div> : "No AI"))}
+                              <div className="w-full relative group">
+                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Past Source Value</label>
+                                <div className="text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border border-slate-100/50 shadow-inner whitespace-pre-wrap text-slate-700 leading-relaxed font-black">{row.sourceValue}</div>
                               </div>
-                              {row.aiSuggestion && !rowAiLoading[row.key] ? (
-                                <div>
-                                  <button
-                                    onClick={() => {
-                                      const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
-                                      updateActiveProject({ rows: newRows });
-                                    }}
-                                    className="absolute top-3 right-20 lg:top-6 lg:right-17 bg-white text-rose-600 font-black p-2 lg:p-3 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-rose-50 active:scale-75 hover:bg-rose-50"
-                                  >
-                                    <svg className="w-5 h-5 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
-                                      updateActiveProject({ rows: newRows });
-                                    }}
-                                    className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-white text-lime-600 p-3 lg:p-4 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-lime-50 active:scale-75 hover:bg-lime-50"
-                                  >
-                                    <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                  </button>
-                                </div>
-                              ) : (
-                                rowAiLoading[row.key] || <button
-                                  onClick={async () => {
-                                    const updatedRows = [...activeProject.rows];
+                              <div className="w-full relative group">
+                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Updated Source Value</label>
+                                <div className="text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border border-slate-100/50 shadow-inner whitespace-pre-wrap text-slate-700 leading-relaxed font-black">{row.updatedSourceValue}</div>
+                              </div>
+                              <div className="w-full relative group">
+                                <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
+                                <textarea
+                                  className="w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black disabled:bg-slate-50 disabled:text-slate-400"
+                                  value={row.targetValue}
+                                  disabled={isConfirming || row.state === DiffRowState.REMOVED}
+                                  onChange={e => {
+                                    if (!isConfirming && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
+                                      const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
 
-                                    if (!settings.geminiApiKey) {
-                                      alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
-                                      setShowSettings(true);
-                                      return;
-                                    }
-                                    try {
-                                      setRowAiLoading({ ...rowAiLoading, [row.key]: true });
-                                      const suggestions = await getTranslationSuggestions(
-                                        activeProject.selectedModel, settings.geminiApiKey,
-                                        activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
-                                        activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
-                                        [{ key: row.key, value: row.sourceValue }]
-                                      );
-                                      setRowAiLoading({ ...rowAiLoading, [row.key]: false });
-                                      Object.keys(suggestions).forEach(key => {
-                                        const rowIndex = updatedRows.findIndex(r => r.key === key);
-                                        if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
-                                      });
-                                      updateActiveProject({ rows: updatedRows });
-                                    } catch (error) {
-                                      console.error("Error fetching AI suggestion:", error);
-                                      alert("⚠️ Error fetching AI suggestion. Please check the console for details.");
-                                    } finally {
+                                      let newStack = activeProject.diffStack;
+                                      if (activeProject.diffStack && activeProject.diffStack.length > 0) {
+                                        newStack = [...activeProject.diffStack];
+                                        const lastDiff = { ...newStack[newStack.length - 1] };
+                                        const diffIdx = lastDiff.rows.findIndex(d => d.key === row.key);
+                                        if (diffIdx !== -1) {
+                                          lastDiff.rows[diffIdx] = { ...lastDiff.rows[diffIdx], targetValue: e.target.value };
+                                          newStack[newStack.length - 1] = lastDiff;
+                                        }
+                                      }
+                                      updateActiveProject({ rows: newRows, diffStack: newStack });
                                     }
                                   }}
-                                  className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-indigo-600 text-white p-3 lg:p-4 rounded-2xl shadow-2xl opacity-100 lg:opacity-0 lg:group-hover:opacity-100 font-black transition-all border border-indigo-50 active:scale-75 hover:bg-indigo-700"
-                                >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                </button>
-                              )}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      />
-
+                          )}
+                        />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                ) : (
+                  filteredRows.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center p-12 text-center">
+                      <div className="w-24 h-24 bg-white rounded-[3rem] mb-6 flex items-center justify-center border border-slate-100 text-slate-100 shadow-sm">
+                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                      </div>
+                      {
+                        activeProject.rows.length > 0
+                          ? <div>
+                            <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">No Search Results</p>
+                            <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Try different search terms.</p>
+                          </div>
+                          : <div>
+                            <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">Manifest Empty</p>
+                            <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Fetch files from your repository to start real-time localization.</p>
+                          </div>
+                      }
+                    </div>
+                  ) : (
+                    <div style={{ height: "100%" }} className="space-y-0 lg:space-y-0 lg:bg-white lg:border lg:border-slate-200 lg:rounded-[3rem] lg:shadow-sm lg:overflow-hidden min-w-full">
+                      {/* Header for Desktop */}
+                      <div className="hidden lg:grid grid-cols-[160px_1fr_1fr_1fr] bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest p-8 sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
+                        <div>ENTRY PATH</div>
+                        <div>SOURCE STRING</div>
+                        <div>TARGET LOCALE</div>
+                        <div>AI SUGGESTION</div>
+                      </div>
+
+                      <div style={{ height: "100%" }} className="divide-y divide-slate-100 space-y-6 lg:space-y-0">
+                        <Virtuoso
+                          style={{ height: "80%" }}
+                          data={filteredRows}
+                          itemContent={(_, row) => (
+                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-[160px_1fr_1fr_1fr] gap-6 lg:gap-12 items-start transition-all ${row.targetValue !== row.originalTargetValue ? 'bg-amber-50/10 lg:bg-amber-50/10 border-amber-100' : 'hover:bg-slate-50/20'}`}>
+                              {/* Key Column */}
+                              <div className="w-full lg:w-auto overflow-hidden">
+                                <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
+                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key}</div>
+                              </div>
+
+                              {/* Source Column */}
+                              <div className="w-full relative group">
+                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Source String</label>
+                                <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border ${row.pastSourceValue !== row.sourceValue ? 'border-rose-300 ring-8 ring-rose-500/5 bg-rose-500/5' : 'border-slate-100/50 shadow-inner'} whitespace-pre-wrap text-slate-700 leading-relaxed font-black`}>
+                                  {row.sourceValue}
+                                  {row.pastSourceValue !== row.sourceValue && (<>
+                                    <span className="absolute -top-3 -right-3 max-lg:hidden group-hover:hidden bg-rose-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">
+                                      Unconfirm
+                                    </span>
+                                    <button
+                                      onClick={() => {
+                                        const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
+                                        updateActiveProject({ rows: newRows });
+                                      }}
+                                      className="absolute -top-3 -right-3 lg:hidden group-hover:block bg-lime-500 text-[9px] lg:text-[10px] font-black text-white px-10 py-1.5 rounded-full border-4 border-white uppercase whitespace-nowrap shadow-2xl"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    </button>
+                                  </>)}
+                                </div>
+                              </div>
+
+                              {/* Target Column */}
+                              <div className="w-full relative group">
+                                <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
+                                <textarea
+                                  className={`w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black ${row.targetValue !== row.originalTargetValue ? 'border-amber-300 ring-8 ring-amber-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}`}
+                                  value={row.targetValue}
+                                  style={{ resize: 'none' }}
+                                  onChange={e => {
+                                    const newRows = activeProject.rows.map(r => r.key === row.key ? {
+                                      ...r,
+                                      targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
+                                    } : r);
+                                    updateActiveProject({ rows: newRows });
+                                  }}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Tab') {
+                                      e.preventDefault();
+                                      const newRows = activeProject.rows.map(r => r.key === row.key ? {
+                                        ...r,
+                                        targetValue: row.originalTargetValue
+                                      } : r);
+                                      updateActiveProject({ rows: newRows });
+                                    }
+                                  }}
+                                  placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
+                                />
+                                {row.targetValue !== row.originalTargetValue && (
+                                  <span className="absolute -top-3 -right-3 bg-amber-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">Modified</span>
+                                )}
+                              </div>
+
+                              {/* AI Column */}
+                              <div className="w-full relative group">
+                                <label className="lg:hidden text-[9px] font-black text-purple-500 uppercase mb-3 block tracking-widest">AI Suggestion</label>
+                                <div
+                                  className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] min-h-[120px] lg:min-h-[160px] whitespace-pre-wrap transition-all leading-relaxed font-bold ${row.aiSuggestion && !rowAiLoading[row.key]
+                                    ? 'bg-indigo-50/50 border border-indigo-100 text-indigo-900 italic shadow-xl shadow-indigo-500/10'
+                                    : rowAiTemp[row.key] && rowAiLoading[row.key]
+                                      ? 'bg-slate-50/50 border border-slate-100 text-indigo-900 italic shadow-xl shadow-slate-500/10'
+                                      : 'bg-slate-50/30 border border-dashed border-slate-200 text-slate-200 flex items-center justify-center font-black text-[10px] uppercase tracking-widest opacity-50'}`}
+                                >
+                                  {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="w-2 h-2 centered relative">
+                                    <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
+                                    <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                  </div></div> : (rowAiLoading[row.key] ?
+                                    <div>Awaiting AI<div className="w-10 h-10 centered relative">
+                                      <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
+                                      <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                    </div></div> : "No AI"))}
+                                </div>
+                                {row.aiSuggestion && !rowAiLoading[row.key] ? (
+                                  <div>
+                                    <button
+                                      onClick={() => {
+                                        const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
+                                        updateActiveProject({ rows: newRows });
+                                      }}
+                                      className="absolute top-3 right-20 lg:top-6 lg:right-17 bg-white text-rose-600 font-black p-2 lg:p-3 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-rose-50 active:scale-75 hover:bg-rose-50"
+                                    >
+                                      <svg className="w-5 h-5 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
+                                        updateActiveProject({ rows: newRows });
+                                      }}
+                                      className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-white text-lime-600 p-3 lg:p-4 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-lime-50 active:scale-75 hover:bg-lime-50"
+                                    >
+                                      <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  rowAiLoading[row.key] || <button
+                                    onClick={async () => {
+                                      const updatedRows = [...activeProject.rows];
+
+                                      if (!settings.geminiApiKey) {
+                                        alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
+                                        setShowSettings(true);
+                                        return;
+                                      }
+                                      try {
+                                        setRowAiLoading({ ...rowAiLoading, [row.key]: true });
+                                        const suggestions = await getTranslationSuggestions(
+                                          activeProject.selectedModel, settings.geminiApiKey,
+                                          activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
+                                          activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
+                                          [{ key: row.key, value: row.sourceValue }],
+                                          activeProject.note?.replace("\n", ", ")
+                                        );
+                                        setRowAiLoading({ ...rowAiLoading, [row.key]: false });
+                                        Object.keys(suggestions).forEach(key => {
+                                          const rowIndex = updatedRows.findIndex(r => r.key === key);
+                                          if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
+                                        });
+                                        updateActiveProject({ rows: updatedRows });
+                                      } catch (error) {
+                                        console.error("Error fetching AI suggestion:", error);
+                                        alert("⚠️ Error fetching AI suggestion. Please check the console for details.");
+                                      } finally {
+                                      }
+                                    }}
+                                    className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-indigo-600 text-white p-3 lg:p-4 rounded-2xl shadow-2xl opacity-100 lg:opacity-0 lg:group-hover:opacity-100 font-black transition-all border border-indigo-50 active:scale-75 hover:bg-indigo-700"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        />
+
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           </div>

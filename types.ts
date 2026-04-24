@@ -16,6 +16,23 @@ export interface TranslationRow {
   aiSuggestion?: string;
 }
 
+export enum DiffRowState {
+  ADDED = 'added',
+  REMOVED = 'removed',
+  MODIFIED = 'modified',
+}
+
+export interface DiffRow extends TranslationRow {
+  state: DiffRowState;
+  updatedSourceValue: string;
+}
+
+export interface Diff {
+  rows: DiffRow[];
+  originalFlatSource: Record<string, ValueType>;
+  originalFlatTarget: Record<string, ValueType>;
+}
+
 export enum GeminiModel {
   'GA4-26B-A4B-IT' = 'gemma-4-26b-a4b-it',
   'GA4-31B-IT' = 'gemma-4-31b-it',
@@ -40,6 +57,13 @@ export interface Project {
   selectedModel: GeminiModel;
   lastUpdated: number;
   originalTargetData: Record<string, ValueType>;
+  note?: string;
+  diffStack: Diff[];
+}
+
+export enum ViewMode {
+  TRANSLATIONS = 'translation',
+  DIFFERENCES = 'differences',
 }
 
 export interface GlobalState {
