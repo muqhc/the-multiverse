@@ -831,9 +831,6 @@ const App: React.FC<AppProps> = (props) => {
                     <>
                       <button onClick={() => setViewMode(ViewMode.TRANSLATIONS)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.TRANSLATIONS ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Translations</button>
                       <button onClick={() => setViewMode(ViewMode.DIFFERENCES)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.DIFFERENCES ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Differences</button>
-                      {viewMode === ViewMode.DIFFERENCES && activeProject?.diffStack?.length ? (
-                        <button onClick={handleClearDiffStack} className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all ml-auto">Clear Diff History</button>
-                      ) : null}
                     </>
                   ) : (
                     <>
@@ -865,7 +862,7 @@ const App: React.FC<AppProps> = (props) => {
                       <div style={{ height: "100%" }} className="divide-y divide-slate-100 space-y-6 lg:space-y-0">
                         <Virtuoso
                           style={{ height: "80%" }}
-                          data={activeDiff.rows}
+                          data={filteredDiffRows}
                           itemContent={(_, row) => (
                             <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-[320px_1fr_1fr_1fr] gap-6 lg:gap-12 items-start transition-all ${row.state === DiffRowState.ADDED ? 'bg-emerald-50/20' : row.state === DiffRowState.REMOVED ? 'bg-rose-50/20' : 'bg-amber-50/20'}`}>
                               <div className="w-full lg:w-auto overflow-hidden">
