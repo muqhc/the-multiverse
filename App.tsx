@@ -736,7 +736,7 @@ const App: React.FC<AppProps> = (props) => {
             )}
 
             <div style={{ height: "100%" }} className="flex-1 overflow-hidden flex flex-col bg-slate-50/20">
-              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white border-b border-slate-100 flex flex-col sm:flex-row items-center justify-start gap-4 sticky top-0 z-20">
+              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white border-b border-slate-100 flex flex-col sm:flex-row items-center justify-start gap-4 sticky top-0 z-30">
                 <div className="relative w-full max-w-4xl">
                   <input
                     type="text"
@@ -823,26 +823,27 @@ const App: React.FC<AppProps> = (props) => {
 
               </div>
 
-              <div style={{ height: "100%" }} className="flex-1 overflow-auto px-4 lg:px-12">
-                {/* PROJECT CONSOLE */}
-                <div className="max-lg:absolute max-lg:top-6 max-lg:right-6">
-                  <div className="bg-white shadow-md shadow-slate-100 border border-slate-100 flex w-fit gap-2 p-1.5 rounded-2xl z-10 relative">
-                    {!isConfirming ? (
-                      <>
-                        <button onClick={() => setViewMode(ViewMode.TRANSLATIONS)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.TRANSLATIONS ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Translations</button>
-                        <button onClick={() => setViewMode(ViewMode.DIFFERENCES)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.DIFFERENCES ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Differences</button>
-                        {viewMode === ViewMode.DIFFERENCES && activeProject?.diffStack?.length ? (
-                          <button onClick={handleClearDiffStack} className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all ml-auto">Clear Diff History</button>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={handleConfirmAll} className="px-5 py-2 text-xs font-black rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all tracking-wide uppercase">Confirm All</button>
-                        <button onClick={() => { setIsConfirming(false); setDriftDiff(null); setViewMode(ViewMode.TRANSLATIONS); }} className="px-5 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase">Cancel</button>
-                      </>
-                    )}
-                  </div>
+              {/* PROJECT CONSOLE */}
+              <div className="-mb-5 right-0 max-lg:absolute max-lg:top-6 max-lg:right-6 lg:px-12 z-20">
+                <div className="bg-white shadow-md shadow-slate-100 border border-slate-100 flex w-fit gap-2 p-1.5 rounded-2xl relative">
+                  {!isConfirming ? (
+                    <>
+                      <button onClick={() => setViewMode(ViewMode.TRANSLATIONS)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.TRANSLATIONS ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Translations</button>
+                      <button onClick={() => setViewMode(ViewMode.DIFFERENCES)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.DIFFERENCES ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Differences</button>
+                      {viewMode === ViewMode.DIFFERENCES && activeProject?.diffStack?.length ? (
+                        <button onClick={handleClearDiffStack} className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all ml-auto">Clear Diff History</button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={handleConfirmAll} className="px-5 py-2 text-xs font-black rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all tracking-wide uppercase">Confirm All</button>
+                      <button onClick={() => { setIsConfirming(false); setDriftDiff(null); setViewMode(ViewMode.TRANSLATIONS); }} className="px-5 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase">Cancel</button>
+                    </>
+                  )}
                 </div>
+              </div>
+
+              <div style={{ height: "100%" }} className="flex-1 overflow-auto px-4 lg:px-12">
                 {viewMode === ViewMode.DIFFERENCES ? (
                   (!activeDiff || activeDiff.rows.length === 0) ? (
                     <div className="h-full flex flex-col items-center justify-center p-12 text-center">
