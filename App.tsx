@@ -206,7 +206,7 @@ const App: React.FC<AppProps> = (props) => {
             key,
             sourceValue: '',
             updatedSourceValue: sourceVal,
-            targetValue: '',
+            targetValue: targetValFromTarget,
             originalTargetValue: targetValFromTarget,
             pastSourceValue: '',
             state: DiffRowState.ADDED
@@ -243,7 +243,7 @@ const App: React.FC<AppProps> = (props) => {
     }
   };
 
-  const handleConfirmAll = () => {
+  const handleApplyDriftDiff = () => {
     if (!activeProject || !driftDiff) return;
 
     let newRows = [...activeProject.rows];
@@ -264,12 +264,13 @@ const App: React.FC<AppProps> = (props) => {
           newRows[index] = {
             ...newRows[index],
             sourceValue: diffRow.updatedSourceValue,
-            originalTargetValue: diffRow.originalTargetValue,
+            targetValue: newRows[index].targetValue === newRows[index].originalTargetValue ? diffRow.targetValue : newRows[index].targetValue,
+            originalTargetValue: diffRow.originalTargetValue
           };
         }
-      } else if (diffRow.state === DiffRowState.REMOVED) {
+      } /* else if (diffRow.state === DiffRowState.REMOVED) {
         newRows = newRows.filter(r => r.key !== diffRow.key);
-      }
+      } */
     });
 
     const orderedKeys = Object.keys(driftDiff.originalFlatSource).filter(key => typeof driftDiff.originalFlatSource[key] === 'string');
@@ -836,7 +837,7 @@ const App: React.FC<AppProps> = (props) => {
                     </>
                   ) : (
                     <>
-                      <button onClick={handleConfirmAll} className="px-5 py-2 text-xs font-black rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all tracking-wide uppercase">Confirm All</button>
+                      <button onClick={handleApplyDriftDiff} className="px-5 py-2 text-xs font-black rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all tracking-wide uppercase">Confirm All</button>
                       <button onClick={() => { setIsConfirming(false); setDriftDiff(null); setViewMode(ViewMode.TRANSLATIONS); }} className="px-5 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase">Cancel</button>
                     </>
                   )}
