@@ -36,14 +36,28 @@ export function unflattenObject(data: Record<string, ValueType>, base: Record<st
 
 const APP_DB_ID = "the_multiverse";
 
+let storageWarningAlerted = false;
+
 // const p = JSON.parse
 // JSON.parse = (v) => { console.log(v); return p(v) }
 
 export function useStorage(name: string, callback: (storage: WeakStorage) => void, dbId: string = APP_DB_ID) {
-  if (!window.indexedDB) {
-    alert("IndexedDB not supported. localStorage is used instead. Data will be missing when migrated. Please download project files and as backup.");
+  if (!window.indexedDB || new URLSearchParams(window.location.search).get("useLocalStorage") == "true") {
+    if (!storageWarningAlerted) {
+      storageWarningAlerted = true;
+      const message = !window.indexedDB
+        ? "This browser does not support IndexedDB.\nUsing LocalStorage for data storage.\nSize of saved data might be limited to ~5MB."
+        : "This browser is using LocalStorage for data storage.\nSize of saved data might be limited to ~5MB.\nFor now, this is for only dev or migrating projects to IndexedDB.\nTo migrate to IndexedDB, export project files via Export button in the header and import them back in IndexedDB."
+      console.warn(message);
+      alert(message);
+    }
     const delegate: WeakStorage = {
-      ...localStorage,
+      setItem: (key: string, value: string) => {
+        localStorage.setItem(key, value);
+      },
+      removeItem: (key: string) => {
+        localStorage.removeItem(key);
+      },
       getItemCallback: (key: string, callback: (value: string | null) => void) => {
         callback(localStorage.getItem(key));
       }

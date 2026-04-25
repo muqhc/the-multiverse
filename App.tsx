@@ -754,7 +754,7 @@ const App: React.FC<AppProps> = (props) => {
             )}
 
             <div style={{ height: "100%" }} className="flex-1 overflow-hidden flex flex-col bg-slate-50/20">
-              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white border-b border-slate-100 flex flex-col sm:flex-row items-center justify-start gap-4 sticky top-0 z-30">
+              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white shadow-md shadow-slate-100 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-start gap-4 sticky top-0 z-30">
                 <div className="relative w-full max-w-4xl">
                   <input
                     type="text"
@@ -766,7 +766,7 @@ const App: React.FC<AppProps> = (props) => {
                   <svg className="w-5 h-5 lg:w-6 lg:h-6 absolute left-4 lg:left-5 top-3 lg:top-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                   <button
                     onClick={() => setShowSearchHelp(!showSearchHelp)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-indigo-500 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-600/20 hover:text-indigo-500 transition-colors"
                     title="Search Syntax Help"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>

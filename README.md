@@ -5,3 +5,4 @@ fully browser app to translate locale file in github, with ai suggestion feature
 ## note
 
 - since 2026-04-26, using IndexedDB, not LocalStorage
+  - you can access legacy locale projects stored in LocalStorage via https://muqhc.github.io/the-multiverse?useLocalStorage=true
