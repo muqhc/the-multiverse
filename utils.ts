@@ -1,5 +1,5 @@
 import { walk } from "walkjs";
-import { Project, ValueType } from "./types";
+import { IndexedDBDataItem, Meta, Project, ValueType, WeakStorage } from "./types";
 
 export function flattenObject(obj: any, prefix = ''): Record<string, ValueType> {
   let newObj: Record<string, ValueType> = {};
@@ -34,13 +34,108 @@ export function unflattenObject(data: Record<string, ValueType>, base: Record<st
   return result;
 }
 
-export function saveToLocal(key: string, data: any) {
-  localStorage.setItem(key, JSON.stringify(data));
+const APP_DB_ID = "the_multiverse";
+
+// const p = JSON.parse
+// JSON.parse = (v) => { console.log(v); return p(v) }
+
+export function useStorage(name: string, callback: (storage: WeakStorage) => void, dbId: string = APP_DB_ID) {
+  if (!window.indexedDB) {
+    alert("IndexedDB not supported. localStorage is used instead. Data will be missing when migrated. Please download project files and as backup.");
+    const delegate: WeakStorage = {
+      ...localStorage,
+      getItemCallback: (key: string, callback: (value: string | null) => void) => {
+        callback(localStorage.getItem(key));
+      }
+    };
+    callback(delegate);
+    return;
+  }
+
+  const request = window.indexedDB.open(name, 1);
+  request.onupgradeneeded = () => {
+    const db = request.result;
+    db.createObjectStore("data", { keyPath: "key" });
+  };
+  request.onsuccess = () => {
+    const db = request.result;
+    const transaction = db.transaction(["data"], "readwrite");
+    const store = transaction.objectStore("data");
+    const delegate: WeakStorage = {
+      getItemCallback: (key: string, callback: (value: string | null) => void) => {
+        store.get(key).onsuccess = (event) => {
+          const result = (event.target as IDBRequest).result as IndexedDBDataItem | undefined;
+          callback(result?.value || null);
+        }
+      },
+      setItem: (key: string, value: string) => {
+        store.put({ key, value });
+      },
+      removeItem: (key: string) => {
+        store.delete(key);
+      }
+    };
+    callback(delegate);
+  };
+
+
 }
 
-export function loadFromLocal(key: string) {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : null;
+
+
+export function saveToLocal(key: string, data: any) {
+  useStorage(key, (storage) => {
+    const text = JSON.stringify(data);
+    storage.getItemCallback(`${key}_meta`, (value) => {
+      const currentMeta = value ? JSON.parse(value) as Meta : { segments: [], length: 0 };
+
+      let segments: { key: string, size: number }[] = [];
+      for (let i = 0; i <= text.length / 5000000; i++) {
+        const sub = text.substring(i * 5000000, (i + 1) * 5000000);
+        segments.push({ key: `${key}_seg${i}`, size: sub.length });
+        storage.setItem(`${key}_seg${i}`, sub);
+      }
+
+      for (const seg of currentMeta.segments) {
+        if (!segments.some(s => s.key === seg.key)) {
+          storage.removeItem(seg.key);
+        }
+      }
+
+      const meta = { segments, length: text.length };
+      storage.setItem(`${key}_meta`, JSON.stringify(meta));
+    });
+
+  });
+}
+
+export function loadFromLocalCallback(key: string, callback: (data: any) => void) {
+  useStorage(key, (storage) => {
+    storage.getItemCallback(`${key}_meta`, (metaRaw) => {
+      if (!metaRaw) {
+        storage.getItemCallback(key, (unSegDataRaw) => {
+          if (!unSegDataRaw) {
+            callback({});
+            return;
+          }
+          callback(JSON.parse(unSegDataRaw));
+        });
+        return;
+      }
+      const meta = JSON.parse(metaRaw) as Meta;
+      const { segments, length } = meta;
+      segments.reduce<(string) => void>((acc, seg) => {
+        return (text: string) => storage.getItemCallback(seg.key, (value) => {
+          acc(text + value)
+        });
+      }, (text: string) => {
+        if (text.length !== length) {
+          throw new Error(`Constructed data length mismatch for key: ${key} (${text.length} != ${length})`);
+        }
+        callback(JSON.parse(text));
+      })("");
+    });
+  });
 }
 
 export function textToBytes(text: string) {

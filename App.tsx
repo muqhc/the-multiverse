@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { GitHubConfig, TranslationRow, GeminiModel, Project, GlobalState, GlobalSettings, ValueType, ViewMode, DiffRowState, Diff, DiffRow } from './types';
-import { flattenObject, unflattenObject, saveToLocal, loadFromLocal, downloadFile, importProject as importProjectFromText } from './utils';
+import { flattenObject, unflattenObject, saveToLocal, loadFromLocalCallback, downloadFile, importProject as importProjectFromText } from './utils';
 import { GitHubService } from './services/githubService';
 import { getTranslationSuggestions } from './services/geminiService';
 import { Virtuoso } from 'react-virtuoso';
@@ -36,22 +36,24 @@ const App: React.FC<AppProps> = (props) => {
 
   // Load from Browser Storage
   useEffect(() => {
-    const saved = loadFromLocal(STORAGE_KEY) as GlobalState;
-    if (saved && saved.projects && saved.projects.length > 0) {
-      setProjects(saved.projects);
-      setActiveProjectId(saved.activeProjectId || saved.projects[0].id);
-      setSettings(saved.settings || { githubToken: '', geminiApiKey: '', suggestionChunkSize: 10 });
-    } else {
-      const demo = createEmptyProject("Default Project");
-      setProjects([demo]);
-      setActiveProjectId(demo.id);
-    }
+    loadFromLocalCallback(STORAGE_KEY, (value) => {
+      const saved = value as GlobalState;
+      if (saved && saved.projects && saved.projects.length > 0) {
+        setProjects(saved.projects);
+        setActiveProjectId(saved.activeProjectId || saved.projects[0].id);
+        setSettings(saved.settings || { githubToken: '', geminiApiKey: '', suggestionChunkSize: 10 });
+      } else {
+        const demo = createEmptyProject("Default Project");
+        setProjects([demo]);
+        setActiveProjectId(demo.id);
+      }
 
-    if (projectLoadQueue.length > 0) {
-      setProjects(prev => [...prev, ...projectLoadQueue.filter(p => !prev.some(x => x.id === p.id))]);
-      setActiveProjectId(projectLoadQueue[0].id);
-      setProjects([]);
-    }
+      if (projectLoadQueue.length > 0) {
+        setProjects(prev => [...prev, ...projectLoadQueue.filter(p => !prev.some(x => x.id === p.id))]);
+        setActiveProjectId(projectLoadQueue[0].id);
+        setProjects([]);
+      }
+    })
   }, []);
 
   // Save to Browser Storage on every state change
@@ -211,11 +213,17 @@ const App: React.FC<AppProps> = (props) => {
             pastSourceValue: '',
             state: DiffRowState.ADDED
           });
-        } else if (existingRow.sourceValue !== sourceVal) {
+        } else if (existingRow.sourceValue !== sourceVal || existingRow.targetValue !== targetValFromTarget) {
           diff.rows.push({
             ...existingRow,
             updatedSourceValue: sourceVal,
-            originalTargetValue: targetValFromTarget, // update originalTargetValue as well? Usually yes.
+            targetValue: existingRow.targetValue === existingRow.sourceValue
+              ? targetValFromTarget
+              : targetValFromTarget === sourceVal
+                ? existingRow.targetValue
+                : targetValFromTarget,
+            originalTargetValue: targetValFromTarget,
+            pastTargetValue: existingRow.targetValue,
             state: DiffRowState.MODIFIED
           });
         }
@@ -278,6 +286,14 @@ const App: React.FC<AppProps> = (props) => {
     const orderedRows = orderedKeys.map(key => rowMap.get(key));
 
     const newDiffStack = [...(activeProject.diffStack || []), driftDiff];
+    const missings = Object.keys(driftDiff.originalFlatSource).filter(key => typeof driftDiff.originalFlatSource[key] === 'string' && !(orderedRows.some(r => r.key === key)))
+
+    if (missings.length > 0) {
+      console.log(missings);
+      console.log(orderedKeys);
+      alert(`⚠️ Error: The set of keys has changed! Cannot apply drift diff. Missings(${missings.length}): ${missings.join(", ")}`);
+      return;
+    }
 
     updateActiveProject({ rows: orderedRows, diffStack: newDiffStack });
     setIsConfirming(false);
@@ -447,6 +463,7 @@ const App: React.FC<AppProps> = (props) => {
             new RegExp(queryWithoutTag).test(r.targetValue.toLowerCase())))
         )) &&
         (
+          ((!(searchTerm.includes("#dupdated") || searchTerm.includes("#dupd"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue)) &&
           ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || r.state === DiffRowState.MODIFIED) &&
           ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || r.state === DiffRowState.ADDED) &&
           ((!(searchTerm.includes("#dremoved") || searchTerm.includes("#drem"))) || r.state === DiffRowState.REMOVED) &&
@@ -788,6 +805,7 @@ const App: React.FC<AppProps> = (props) => {
                         <div className="grid grid-cols-2 gap-x-4 gap-y-6 pt-4 border-t border-slate-50">
                           {[
                             ...(viewMode === ViewMode.DIFFERENCES ? [
+                              { tag: "#dupdated, #dupd", desc: "Show updated rows in diff" },
                               { tag: "#dmodified, #dmod", desc: "Show modified rows in diff" },
                               { tag: "#dadded, #dadd", desc: "Show added rows in diff" },
                               { tag: "#dremoved, #drem", desc: "Show removed rows in diff" },
@@ -819,7 +837,7 @@ const App: React.FC<AppProps> = (props) => {
                   {unconfirmedCount > 0 && <span className="text-rose-600 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 shadow-sm">{unconfirmedCount} Unconfirmed</span>}
                   {modifiedCount > 0 && <span className="text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 shadow-sm">{modifiedCount} Modified</span>}
                   <span className="hidden sm:inline w-1 h-1 bg-slate-200 rounded-full"></span>
-                  <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : activeDiff?.rows?.length || 0} Entries</span>
+                  <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : filteredDiffRows.length || 0} Entries</span>
                 </div>
 
               </div>
@@ -864,10 +882,10 @@ const App: React.FC<AppProps> = (props) => {
                           style={{ height: "80%" }}
                           data={filteredDiffRows}
                           itemContent={(_, row) => (
-                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-[320px_1fr_1fr_1fr] gap-6 lg:gap-12 items-start transition-all ${row.state === DiffRowState.ADDED ? 'bg-emerald-50/20' : row.state === DiffRowState.REMOVED ? 'bg-rose-50/20' : 'bg-amber-50/20'}`}>
+                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-4 gap-6 lg:gap-12 items-start transition-all ${row.state === DiffRowState.ADDED ? 'bg-emerald-50/20' : row.state === DiffRowState.REMOVED ? 'bg-rose-50/20' : 'bg-amber-50/20'}`}>
                               <div className="w-full lg:w-auto overflow-hidden">
                                 <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
-                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key} <span className={`uppercase font-black text-[9px] ml-2 px-2 py-0.5 rounded-full ${row.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : row.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{row.state}</span></div>
+                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key} <span className={`uppercase font-black text-[9px] ml-2 px-2 py-0.5 rounded-full w-fit inline-block ${row.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : row.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{row.state}</span></div>
                               </div>
                               <div className="w-full relative group">
                                 <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Past Source Value</label>
@@ -880,7 +898,7 @@ const App: React.FC<AppProps> = (props) => {
                               <div className="w-full relative group">
                                 <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
                                 <textarea
-                                  className="w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black disabled:bg-slate-50 disabled:text-slate-400"
+                                  className={`w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black disabled:bg-slate-50 disabled:text-slate-400 ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? 'border-amber-300 ring-8 ring-green-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}`}
                                   value={row.targetValue}
                                   disabled={isConfirming || row.state === DiffRowState.REMOVED}
                                   onChange={e => {
@@ -901,6 +919,9 @@ const App: React.FC<AppProps> = (props) => {
                                     }
                                   }}
                                 />
+                                {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (
+                                  <span className="absolute -top-3 -right-3 bg-green-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">UPDATED</span>
+                                )}
                               </div>
                             </div>
                           )}
@@ -941,7 +962,7 @@ const App: React.FC<AppProps> = (props) => {
                           style={{ height: "80%" }}
                           data={filteredRows}
                           itemContent={(_, row) => (
-                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-[160px_1fr_1fr_1fr] gap-6 lg:gap-12 items-start transition-all ${row.targetValue !== row.originalTargetValue ? 'bg-amber-50/10 lg:bg-amber-50/10 border-amber-100' : 'hover:bg-slate-50/20'}`}>
+                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-4 gap-6 lg:gap-12 items-start transition-all ${row.targetValue !== row.originalTargetValue ? 'bg-amber-50/10 lg:bg-amber-50/10 border-amber-100' : 'hover:bg-slate-50/20'}`}>
                               {/* Key Column */}
                               <div className="w-full lg:w-auto overflow-hidden">
                                 <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>

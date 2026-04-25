@@ -25,6 +25,7 @@ export enum DiffRowState {
 export interface DiffRow extends TranslationRow {
   state: DiffRowState;
   updatedSourceValue: string;
+  pastTargetValue?: string;
 }
 
 export interface Diff {
@@ -73,3 +74,19 @@ export interface GlobalState {
 }
 
 export type ValueType = string | number | boolean;
+
+export interface Meta {
+  segments: { key: string, size: number }[];
+  length: number;
+}
+
+export interface WeakStorage {
+  getItemCallback(key: string, callback: (value: string | null) => void): void;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export interface IndexedDBDataItem {
+  key: string;
+  value: string;
+}

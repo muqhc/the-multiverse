@@ -14,7 +14,7 @@ export class GitHubService {
 
   private async fetchRaw(path: string) {
     const url = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(this.config.branch)}`;
-    const response = await fetch(url, 
+    const response = await fetch(url,
       this.token ? {
         headers: {
           Authorization: `token ${this.token}`,
@@ -37,6 +37,7 @@ export class GitHubService {
   async loadFiles() {
     const source = await this.fetchRaw(this.config.sourcePath);
     const target = await this.fetchRaw(this.config.targetPath);
+    console.log("Target:", target);
     return { source, target };
   }
 
@@ -53,11 +54,11 @@ export class GitHubService {
         ref: ref
       })
     })();
-    
+
     if (!metadataRes.data) throw new Error("Could not find existing file for update.");
     const metadata = metadataRes.data;
     console.log("File metadata:", metadata);
-    
+
     const updateUrl = `https://api.github.com/repos/${this.config.owner}/${this.config.repo}/contents/${encodeURIComponent(path)}`;
     const response = await fetch(updateUrl, {
       method: 'PUT',
