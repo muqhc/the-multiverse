@@ -67,6 +67,12 @@ const App: React.FC<AppProps> = (props) => {
     projects.find(p => p.id === activeProjectId) || null
     , [projects, activeProjectId]);
 
+  const activeDiff: Diff = isConfirming ? driftDiff : (activeProject?.diffStack?.length ? activeProject.diffStack[activeProject.diffStack.length - 1] : { rows: [], originalFlatSource: {}, originalFlatTarget: {} });
+  const keyDiffMap: Map<string, DiffRow> = activeDiff.rows.reduce((map, row) => {
+    map.set(row.key, row);
+    return map;
+  }, new Map<string, DiffRow>());
+
   // Sync rename input with active project
   useEffect(() => {
     if (activeProject) setEditNameValue(activeProject.name);
@@ -412,8 +418,10 @@ const App: React.FC<AppProps> = (props) => {
     alert("Project URL copied to clipboard!");
   };
 
-  const filteredRows = activeProject?.rows?.filter?.(r =>
-    searchTerms.toLowerCase().split("||").some((searchTerm) => {
+  const filteredRows = activeProject?.rows?.filter?.(r => {
+    const dr = keyDiffMap.get(r.key);
+
+    return searchTerms.toLowerCase().split("||").some((searchTerm) => {
       const queryWithoutTag = searchTerm.toLowerCase().substring(0, searchTerm.includes("#") ? searchTerm.indexOf("#") : searchTerm.length).trim();
       return ((!searchTerm.includes("#reg") ? (
         r.key.toLowerCase().includes(queryWithoutTag) ||
@@ -428,6 +436,9 @@ const App: React.FC<AppProps> = (props) => {
             new RegExp(queryWithoutTag).test(r.targetValue.toLowerCase())))
         )) &&
         (
+          ((!(searchTerm.includes("#dupdated") || searchTerm.includes("#dupd"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue)) &&
+          ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || dr && dr.state === DiffRowState.MODIFIED) &&
+          ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || dr && dr.state === DiffRowState.ADDED) &&
           ((!(searchTerm.includes("#modified") || searchTerm.includes("#mod"))) || r.targetValue !== r.originalTargetValue) &&
           ((!(searchTerm.includes("#unconfirmed") || searchTerm.includes("#unc"))) || r.sourceValue !== r.pastSourceValue) &&
           ((!(searchTerm.includes("#done") || searchTerm.includes("#don"))) || r.sourceValue !== r.originalTargetValue && r.targetValue === r.originalTargetValue) &&
@@ -441,11 +452,10 @@ const App: React.FC<AppProps> = (props) => {
         )
       )
     })
-  ) || [];
+  }) || [];
 
   const modifiedCount = activeProject?.rows.filter(r => r.targetValue !== r.originalTargetValue).length || 0;
   const unconfirmedCount = activeProject?.rows.filter(r => r.sourceValue !== r.pastSourceValue).length || 0;
-  const activeDiff: Diff = isConfirming ? driftDiff : (activeProject?.diffStack?.length ? activeProject.diffStack[activeProject.diffStack.length - 1] : { rows: [], originalFlatSource: {}, originalFlatTarget: {} });
 
   const filteredDiffRows = activeDiff.rows.filter(r =>
     searchTerms.toLowerCase().split("||").some((searchTerm) => {
@@ -805,11 +815,11 @@ const App: React.FC<AppProps> = (props) => {
                         <div className="grid grid-cols-2 gap-x-4 gap-y-6 pt-4 border-t border-slate-50">
                           {[
                             ...(viewMode === ViewMode.DIFFERENCES ? [
-                              { tag: "#dupdated, #dupd", desc: "Show updated rows in diff" },
-                              { tag: "#dmodified, #dmod", desc: "Show modified rows in diff" },
-                              { tag: "#dadded, #dadd", desc: "Show added rows in diff" },
                               { tag: "#dremoved, #drem", desc: "Show removed rows in diff" },
                             ] : []),
+                            { tag: "#dupdated, #dupd", desc: "Show updated rows in diff" },
+                            { tag: "#dmodified, #dmod", desc: "Show modified rows in diff" },
+                            { tag: "#dadded, #dadd", desc: "Show added rows in diff" },
                             { tag: "#modified, #mod", desc: "Show modified rows" },
                             { tag: "#unconfirmed, #unc", desc: "Show unconfirmed rows" },
                             { tag: "#empty, #emp", desc: "Missing translations" },
@@ -966,7 +976,7 @@ const App: React.FC<AppProps> = (props) => {
                               {/* Key Column */}
                               <div className="w-full lg:w-auto overflow-hidden">
                                 <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
-                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key}</div>
+                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key}{keyDiffMap.get(row.key) && (<span className={`uppercase font-black text-[9px] ml-2 px-2 py-0.5 rounded-full w-fit inline-block ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{keyDiffMap.get(row.key)?.state}</span>)}</div>
                               </div>
 
                               {/* Source Column */}
