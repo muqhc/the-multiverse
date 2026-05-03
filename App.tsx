@@ -33,6 +33,7 @@ const App: React.FC<AppProps> = (props) => {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.TRANSLATIONS);
   const [isConfirming, setIsConfirming] = useState(false);
   const [driftDiff, setDriftDiff] = useState<Diff | null>(null);
+  const [viewingPast, setViewingPast] = useState<Record<string, boolean>>({});
 
   // Load from Browser Storage
   useEffect(() => {
@@ -62,6 +63,10 @@ const App: React.FC<AppProps> = (props) => {
       saveToLocal(STORAGE_KEY, { projects, activeProjectId, settings });
     }
   }, [projects, activeProjectId, settings]);
+
+  useEffect(() => {
+    setViewingPast({});
+  }, [viewMode]);
 
   const activeProject = useMemo(() =>
     projects.find(p => p.id === activeProjectId) || null
@@ -437,6 +442,7 @@ const App: React.FC<AppProps> = (props) => {
         )) &&
         (
           ((!(searchTerm.includes("#dupdated") || searchTerm.includes("#dupd"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue)) &&
+          ((!(searchTerm.includes("#dtranslated") || searchTerm.includes("#dtra"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue && dr.pastTargetValue === dr.sourceValue)) &&
           ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || dr && dr.state === DiffRowState.MODIFIED) &&
           ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || dr && dr.state === DiffRowState.ADDED) &&
           ((!(searchTerm.includes("#modified") || searchTerm.includes("#mod"))) || r.targetValue !== r.originalTargetValue) &&
@@ -474,6 +480,7 @@ const App: React.FC<AppProps> = (props) => {
         )) &&
         (
           ((!(searchTerm.includes("#dupdated") || searchTerm.includes("#dupd"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue)) &&
+          ((!(searchTerm.includes("#dtranslated") || searchTerm.includes("#dtra"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue && r.pastTargetValue === r.sourceValue)) &&
           ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || r.state === DiffRowState.MODIFIED) &&
           ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || r.state === DiffRowState.ADDED) &&
           ((!(searchTerm.includes("#dremoved") || searchTerm.includes("#drem"))) || r.state === DiffRowState.REMOVED) &&
@@ -818,6 +825,7 @@ const App: React.FC<AppProps> = (props) => {
                               { tag: "#dremoved, #drem", desc: "Show removed rows in diff" },
                             ] : []),
                             { tag: "#dupdated, #dupd", desc: "Show updated rows in diff" },
+                            { tag: "#dtranslated, #dtra", desc: "Show translated(updated while undone) rows in diff" },
                             { tag: "#dmodified, #dmod", desc: "Show modified rows in diff" },
                             { tag: "#dadded, #dadd", desc: "Show added rows in diff" },
                             { tag: "#modified, #mod", desc: "Show modified rows" },
@@ -903,16 +911,23 @@ const App: React.FC<AppProps> = (props) => {
                               </div>
                               <div className="w-full relative group">
                                 <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Updated Source Value</label>
-                                <div className="text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border border-slate-100/50 shadow-inner whitespace-pre-wrap text-slate-700 leading-relaxed font-black">{row.updatedSourceValue}</div>
+                                <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border border-slate-100/50 shadow-inner whitespace-pre-wrap text-slate-700 leading-relaxed font-black ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'border-blue-300 ring-8 ring-blue-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white shadow-sm'}`}>{row.updatedSourceValue}</div>
+                                {(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) && (
+                                  <span className="absolute -top-3 -right-3 bg-blue-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">CHANGED</span>
+                                )}
                               </div>
                               <div className="w-full relative group">
                                 <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
                                 <textarea
-                                  className={`w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black disabled:bg-slate-50 disabled:text-slate-400 ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? 'border-amber-300 ring-8 ring-green-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}`}
-                                  value={row.targetValue}
-                                  disabled={isConfirming || row.state === DiffRowState.REMOVED}
+                                  className={`
+                                    w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black disabled:bg-slate-50 disabled:text-slate-400
+                                    ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'border-blue-300 ring-8 ring-blue-500/5 shadow-2xl' : 'border-green-300 ring-8 ring-green-500/5 shadow-2xl') : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}
+                                    ${viewingPast[row.key] ? 'bg-rose' : 'bg-white'}`
+                                  }
+                                  value={viewingPast[row.key] ? row.pastTargetValue : row.targetValue}
+                                  disabled={isConfirming || row.state === DiffRowState.REMOVED || viewingPast[row.key]}
                                   onChange={e => {
-                                    if (!isConfirming && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
+                                    if (!isConfirming && !viewingPast[row.key] && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
                                       const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
 
                                       let newStack = activeProject.diffStack;
@@ -929,9 +944,19 @@ const App: React.FC<AppProps> = (props) => {
                                     }
                                   }}
                                 />
-                                {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (
-                                  <span className="absolute -top-3 -right-3 bg-green-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">UPDATED</span>
-                                )}
+                                {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (row.pastTargetValue !== row.sourceValue ? (<div className="group">
+                                  {viewingPast[row.key] || <span className="absolute group-hover:hidden -top-3 -right-3 bg-blue-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">UPDATED</span>}
+                                  <button
+                                    className={`absolute ${viewingPast[row.key] ? 'block' : 'hidden'} group-hover:block -top-3 -right-3 bg-red-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl`}
+                                    onClick={e => {
+                                      setViewingPast({ ...viewingPast, [row.key]: !viewingPast[row.key] })
+                                    }}
+                                  >
+                                    {viewingPast[row.key] ? "VIEW CURRENT" : "VIEW PAST"}
+                                  </button>
+                                </div>) : (
+                                  <span className="absolute -top-3 -right-3 bg-green-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">TRANSLATED</span>
+                                ))}
                               </div>
                             </div>
                           )}

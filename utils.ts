@@ -17,7 +17,7 @@ export function flattenObject(obj: any, prefix = ''): Record<string, ValueType> 
 }
 
 export function unflattenObject(data: Record<string, ValueType>, base: Record<string, ValueType> = {}): any {
-  let result: any = JSON.parse(JSON.stringify(base));
+  let result: any = parseJson(JSON.stringify(base));
   for (const rawKey in data) {
     const keys = rawKey.split('.');
     keys.reduce((acc, k, j) => {
@@ -34,12 +34,12 @@ export function unflattenObject(data: Record<string, ValueType>, base: Record<st
   return result;
 }
 
-const APP_DB_ID = "the_multiverse";
+export const APP_DB_ID = "the_multiverse";
 
 let storageWarningAlerted = false;
 
-// const p = JSON.parse
-// JSON.parse = (v) => { console.log(v); return p(v) }
+// const p = parseJson
+// parseJson = (v) => { console.log(v); return p(v) }
 
 export function useStorage(name: string, callback: (storage: WeakStorage) => void, dbId: string = APP_DB_ID) {
   if (!window.indexedDB || new URLSearchParams(window.location.search).get("useLocalStorage") == "true") {
@@ -100,15 +100,25 @@ export function useStorage(name: string, callback: (storage: WeakStorage) => voi
 export function saveToLocal(key: string, data: any) {
   useStorage(key, (storage) => {
     const text = JSON.stringify(data);
-    storage.getItemCallback(`${key}_meta`, (value) => {
-      const currentMeta = value ? JSON.parse(value) as Meta : { segments: [], length: 0 };
 
-      let segments: { key: string, size: number }[] = [];
-      for (let i = 0; i <= text.length / 5000000; i++) {
-        const sub = text.substring(i * 5000000, (i + 1) * 5000000);
-        segments.push({ key: `${key}_seg${i}`, size: sub.length });
-        storage.setItem(`${key}_seg${i}`, sub);
-      }
+    let segments: { key: string, size: number, sub: string }[] = [];
+    for (let i = 0; i <= text.length / 5000000; i++) {
+      const sub = text.substring(i * 5000000, (i + 1) * 5000000);
+      segments.push({ key: `${key}_seg${i}`, size: sub.length, sub: sub });
+    }
+
+    let reduced: string = segments.reduce((acc, seg) => (acc + seg.sub), "");
+    if (text !== reduced) {
+      alert(`Constructed data length mismatch for key: ${key} (${text.length} != ${reduced.length})`);
+      return;
+    }
+
+    storage.getItemCallback(`${key}_meta`, (value) => {
+      const currentMeta = value ? parseJson(value) as Meta : { segments: [], length: 0 };
+
+      segments.forEach((seg) => {
+        storage.setItem(seg.key, seg.sub);
+      });
 
       for (const seg of currentMeta.segments) {
         if (!segments.some(s => s.key === seg.key)) {
@@ -132,22 +142,22 @@ export function loadFromLocalCallback(key: string, callback: (data: any) => void
             callback({});
             return;
           }
-          callback(JSON.parse(unSegDataRaw));
+          callback(parseJson(unSegDataRaw));
         });
         return;
       }
-      const meta = JSON.parse(metaRaw) as Meta;
+      const meta = parseJson(metaRaw) as Meta;
       const { segments, length } = meta;
-      segments.reduce<(string) => void>((acc, seg) => {
-        return (text: string) => storage.getItemCallback(seg.key, (value) => {
-          acc(text + value)
-        });
-      }, (text: string) => {
-        if (text.length !== length) {
-          throw new Error(`Constructed data length mismatch for key: ${key} (${text.length} != ${length})`);
+      parallelLoadCallback<{ key: string, size: number }, string>(
+        segments, (seg, callback) => storage.getItemCallback(seg.key, callback),
+        (values) => {
+          const text = values.reduce((acc, val) => acc + val, "");
+          if (text.length !== length) {
+            throw new Error(`Constructed data length mismatch for key: ${key} (${text.length} != ${length})`);
+          }
+          callback(parseJson(text));
         }
-        callback(JSON.parse(text));
-      })("");
+      )
     });
   });
 }
@@ -185,7 +195,7 @@ export function downloadFile(filename: string, content: string, contentType: str
 }
 
 export function importProject(content: string) {
-  const importedProject = JSON.parse(content) as Project;
+  const importedProject = parseJson(content) as Project;
 
   if (!importedProject.id || !importedProject.name || !importedProject.config || !importedProject.rows) {
     throw new Error("Invalid project file format");
@@ -200,6 +210,28 @@ export function importProject(content: string) {
   return newProject;
 }
 
+export function parseJson(text: string) {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.warn("Failed to parse JSON", text);
+    console.error(e);
+    downloadFile("parsingFailed.json", text);
+    throw e;
+  }
+}
 
-
+const WIP = Symbol("WIP");
+export function parallelLoadCallback<T, R>(queries: T[], loader: (query: T, callback: (value: R | null) => void) => void, callback: (values: (R | null)[]) => void) {
+  let index = 0;
+  let results: (R | null | typeof WIP)[] = Array(queries.length).fill(WIP);
+  queries.forEach((query, index) => {
+    loader(query, (value) => {
+      results[index] = value;
+      if (!results.includes(WIP)) {
+        callback(results as (R | null)[]);
+      }
+    });
+  });
+}
 
