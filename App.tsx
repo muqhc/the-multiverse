@@ -34,6 +34,7 @@ const App: React.FC<AppProps> = (props) => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [driftDiff, setDriftDiff] = useState<Diff | null>(null);
   const [viewingPast, setViewingPast] = useState<Record<string, boolean>>({});
+  const [isSearchCollapsedMobile, setIsSearchCollapsedMobile] = useState(true);
 
   // Load from Browser Storage
   useEffect(() => {
@@ -771,8 +772,22 @@ const App: React.FC<AppProps> = (props) => {
             )}
 
             <div style={{ height: "100%" }} className="flex-1 overflow-hidden flex flex-col bg-slate-50/20">
-              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white shadow-md shadow-slate-100 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-start gap-4 sticky top-0 z-30">
-                <div className="relative w-full max-w-4xl">
+              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white shadow-md shadow-slate-100 border-b border-slate-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sticky top-0 z-30">
+                {/* Mobile Header with Stats and Search Toggle */}
+                <div className="flex items-center justify-between w-full lg:hidden">
+                  <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap overflow-x-auto no-scrollbar">
+                    {unconfirmedCount > 0 && <span className="text-rose-600 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 shadow-sm">{unconfirmedCount} Unconfirmed</span>}
+                    {modifiedCount > 0 && <span className="text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 shadow-sm">{modifiedCount} Modified</span>}
+                    <span className="hidden sm:inline w-1 h-1 bg-slate-200 rounded-full"></span>
+                    <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : filteredDiffRows.length || 0} Entries</span>
+                  </div>
+                  <button onClick={() => setIsSearchCollapsedMobile(!isSearchCollapsedMobile)} className={`ml-4 p-2 rounded-xl transition-colors flex-shrink-0 ${!isSearchCollapsedMobile ? 'bg-indigo-50 text-indigo-500' : 'bg-slate-50 text-slate-400 hover:text-indigo-500'}`} title="Toggle Search">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </button>
+                </div>
+
+                {/* Search Bar Container */}
+                <div className={`relative w-full max-w-4xl ${isSearchCollapsedMobile ? 'hidden lg:block' : 'block'}`}>
                   <input
                     type="text"
                     placeholder="Search strings, keys, or translations..."
@@ -849,15 +864,15 @@ const App: React.FC<AppProps> = (props) => {
                     </div>
                   )}
 
-
                 </div>
-                <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap no-scrollbar">
+
+                {/* Desktop Stats */}
+                <div className="hidden lg:flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap no-scrollbar">
                   {unconfirmedCount > 0 && <span className="text-rose-600 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 shadow-sm">{unconfirmedCount} Unconfirmed</span>}
                   {modifiedCount > 0 && <span className="text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 shadow-sm">{modifiedCount} Modified</span>}
                   <span className="hidden sm:inline w-1 h-1 bg-slate-200 rounded-full"></span>
                   <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : filteredDiffRows.length || 0} Entries</span>
                 </div>
-
               </div>
 
               {/* PROJECT CONSOLE */}
@@ -888,41 +903,41 @@ const App: React.FC<AppProps> = (props) => {
                       <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Fetch files to check for drift or view past applied updates.</p>
                     </div>
                   ) : (
-                    <div style={{ height: "100%" }} className="space-y-6 lg:space-y-0 lg:bg-white lg:border lg:border-slate-200 lg:rounded-[3rem] lg:shadow-sm lg:overflow-hidden min-w-full">
-                      <div className="hidden lg:grid grid-cols-[320px_1fr_1fr_1fr] bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest p-8 sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
-                        <div>ENTRY PATH</div>
-                        <div>CURRENT SOURCE VALUE</div>
-                        <div>UPDATED SOURCE VALUE</div>
-                        <div>TARGET LOCALE</div>
+                    <div style={{ height: "100%" }} className="lg:bg-white lg:border lg:border-slate-200 lg:rounded-md lg:shadow-sm min-w-full flex flex-col">
+                      <div className="hidden lg:grid grid-cols-4 bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest p-2 sticky top-0 z-10 divide-x divide-slate-200">
+                        <div className="px-2 flex items-center">ENTRY PATH</div>
+                        <div className="px-2 flex items-center">CURRENT SOURCE VALUE</div>
+                        <div className="px-2 flex items-center">UPDATED SOURCE VALUE</div>
+                        <div className="px-2 flex items-center">TARGET LOCALE</div>
                       </div>
-                      <div style={{ height: "100%" }} className="divide-y divide-slate-100 space-y-6 lg:space-y-0">
+                      <div style={{ height: "100%" }} className="flex-1">
                         <Virtuoso
-                          style={{ height: "80%" }}
+                          style={{ height: "100%" }}
                           data={filteredDiffRows}
                           itemContent={(_, row) => (
-                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-4 gap-6 lg:gap-12 items-start transition-all ${row.state === DiffRowState.ADDED ? 'bg-emerald-50/20' : row.state === DiffRowState.REMOVED ? 'bg-rose-50/20' : 'bg-amber-50/20'}`}>
-                              <div className="w-full lg:w-auto overflow-hidden">
-                                <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
-                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key} <span className={`uppercase font-black text-[9px] ml-2 px-2 py-0.5 rounded-full w-fit inline-block ${row.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : row.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{row.state}</span></div>
+                            <div key={row.key} className={`max-lg:border-2 max-lg:py-5 max-lg:bg-white border-b border-slate-200 flex flex-col lg:grid lg:grid-cols-4 items-stretch transition-all ${row.state === DiffRowState.ADDED ? 'bg-emerald-50/20' : row.state === DiffRowState.REMOVED ? 'bg-rose-50/20' : 'bg-amber-50/20'} divide-y lg:divide-y-0 lg:divide-x divide-slate-200 lg:hover:bg-slate-50`}>
+                              <div className="w-full lg:w-auto p-2 flex flex-col justify-center">
+                                <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-1 block tracking-widest">Entry Path</label>
+                                <div className="text-[11px] font-mono text-slate-600 break-all leading-tight font-bold tracking-tighter">{row.key} <span className={`uppercase font-black text-[9px] ml-1 px-1.5 py-0.5 rounded-sm w-fit inline-block ${row.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : row.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{row.state}</span></div>
                               </div>
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Past Source Value</label>
-                                <div className="text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border border-slate-100/50 shadow-inner whitespace-pre-wrap text-slate-700 leading-relaxed font-black">{row.sourceValue}</div>
+                              <div className="w-full relative group p-2">
+                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-1 block tracking-widest">Past Source Value</label>
+                                <div className="text-sm p-1.5 rounded-sm bg-slate-50/50 border border-slate-200 whitespace-pre-wrap text-slate-700 leading-snug font-medium h-full">{row.sourceValue}</div>
                               </div>
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Updated Source Value</label>
-                                <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border border-slate-100/50 shadow-inner whitespace-pre-wrap text-slate-700 leading-relaxed font-black ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'border-blue-300 ring-8 ring-blue-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white shadow-sm'}`}>{row.updatedSourceValue}</div>
+                              <div className="w-full relative group p-2">
+                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-1 block tracking-widest">Updated Source Value</label>
+                                <div className={`text-sm p-1.5 rounded-sm bg-slate-50/50 border whitespace-pre-wrap text-slate-700 leading-snug font-medium h-full ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'border-blue-300 ring-1 ring-blue-500/20 bg-white' : 'border-slate-200 bg-white'}`}>{row.updatedSourceValue}</div>
                                 {(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) && (
-                                  <span className="absolute -top-3 -right-3 bg-blue-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">CHANGED</span>
+                                  <span className="absolute -top-2 max-lg:top-2 right-1 bg-blue-500 text-[8px] font-black text-white px-2 py-0.5 rounded-sm uppercase shadow-sm">CHANGED</span>
                                 )}
                               </div>
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
+                              <div className="w-full relative group p-2">
+                                <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-1 block tracking-widest">Target Locale</label>
                                 <textarea
                                   className={`
-                                    w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black disabled:bg-slate-50 disabled:text-slate-400
-                                    ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'border-blue-300 ring-8 ring-blue-500/5 shadow-2xl' : 'border-green-300 ring-8 ring-green-500/5 shadow-2xl') : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}
-                                    ${viewingPast[row.key] ? 'bg-rose' : 'bg-white'}`
+                                    w-full h-full text-sm p-1.5 rounded-sm border outline-none transition-all min-h-[40px] leading-snug font-medium disabled:bg-slate-50 disabled:text-slate-400
+                                    ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'border-blue-300 ring-1 ring-blue-500/20' : 'border-green-300 ring-1 ring-green-500/20') : 'border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500/30'}
+                                    ${viewingPast[row.key] ? 'bg-rose-50' : 'bg-white'}`
                                   }
                                   value={viewingPast[row.key] ? row.pastTargetValue : row.targetValue}
                                   disabled={isConfirming || row.state === DiffRowState.REMOVED || viewingPast[row.key]}
@@ -945,9 +960,9 @@ const App: React.FC<AppProps> = (props) => {
                                   }}
                                 />
                                 {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (row.pastTargetValue !== row.sourceValue ? (<div className="group">
-                                  {viewingPast[row.key] || <span className="absolute group-hover:hidden -top-3 -right-3 bg-blue-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">UPDATED</span>}
+                                  {viewingPast[row.key] || <span className="absolute group-hover:hidden -top-2 max-lg:top-2 right-1 bg-blue-500 text-[8px] font-black text-white px-2 py-0.5 rounded-sm uppercase shadow-sm">UPDATED</span>}
                                   <button
-                                    className={`absolute ${viewingPast[row.key] ? 'block' : 'hidden'} group-hover:block -top-3 -right-3 bg-red-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl`}
+                                    className={`absolute ${viewingPast[row.key] ? 'block' : 'hidden'} group-hover:block -top-2 max-lg:top-2 right-1 bg-red-500 text-[8px] font-black text-white px-2 py-0.5 rounded-sm uppercase shadow-sm cursor-pointer`}
                                     onClick={e => {
                                       setViewingPast({ ...viewingPast, [row.key]: !viewingPast[row.key] })
                                     }}
@@ -955,7 +970,7 @@ const App: React.FC<AppProps> = (props) => {
                                     {viewingPast[row.key] ? "VIEW CURRENT" : "VIEW PAST"}
                                   </button>
                                 </div>) : (
-                                  <span className="absolute -top-3 -right-3 bg-green-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">TRANSLATED</span>
+                                  <span className="absolute -top-2 max-lg:top-2 right-1 bg-green-500 text-[8px] font-black text-white px-2 py-0.5 rounded-sm uppercase shadow-sm">TRANSLATED</span>
                                 ))}
                               </div>
                             </div>
@@ -983,34 +998,34 @@ const App: React.FC<AppProps> = (props) => {
                       }
                     </div>
                   ) : (
-                    <div style={{ height: "100%" }} className="space-y-0 lg:space-y-0 lg:bg-white lg:border lg:border-slate-200 lg:rounded-[3rem] lg:shadow-sm lg:overflow-hidden min-w-full">
+                    <div style={{ height: "100%" }} className="lg:bg-white lg:border lg:border-slate-200 lg:rounded-md lg:shadow-sm min-w-full flex flex-col">
                       {/* Header for Desktop */}
-                      <div className="hidden lg:grid grid-cols-[160px_1fr_1fr_1fr] bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest p-8 sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
-                        <div>ENTRY PATH</div>
-                        <div>SOURCE STRING</div>
-                        <div>TARGET LOCALE</div>
-                        <div>AI SUGGESTION</div>
+                      <div className="hidden lg:grid grid-cols-4 bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest p-2 sticky top-0 z-10 divide-x divide-slate-200">
+                        <div className="px-2 flex items-center">ENTRY PATH</div>
+                        <div className="px-2 flex items-center">SOURCE STRING</div>
+                        <div className="px-2 flex items-center">TARGET LOCALE</div>
+                        <div className="px-2 flex items-center">AI SUGGESTION</div>
                       </div>
 
-                      <div style={{ height: "100%" }} className="divide-y divide-slate-100 space-y-6 lg:space-y-0">
+                      <div style={{ height: "100%" }} className="flex-1">
                         <Virtuoso
-                          style={{ height: "80%" }}
+                          style={{ height: "100%" }}
                           data={filteredRows}
                           itemContent={(_, row) => (
-                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-4 gap-6 lg:gap-12 items-start transition-all ${row.targetValue !== row.originalTargetValue ? 'bg-amber-50/10 lg:bg-amber-50/10 border-amber-100' : 'hover:bg-slate-50/20'}`}>
+                            <div key={row.key} className={`max-lg:border-2 max-lg:py-5 max-lg:bg-white border-b border-slate-200 flex flex-col lg:grid lg:grid-cols-4 items-stretch transition-all ${row.targetValue !== row.originalTargetValue ? 'bg-amber-50/20' : 'hover:bg-slate-50'} divide-y lg:divide-y-0 lg:divide-x divide-slate-200`}>
                               {/* Key Column */}
-                              <div className="w-full lg:w-auto overflow-hidden">
-                                <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
-                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key}{keyDiffMap.get(row.key) && (<span className={`uppercase font-black text-[9px] ml-2 px-2 py-0.5 rounded-full w-fit inline-block ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{keyDiffMap.get(row.key)?.state}</span>)}</div>
+                              <div className="w-full lg:w-auto p-2 flex flex-col justify-center">
+                                <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-1 block tracking-widest">Entry Path</label>
+                                <div className="text-[11px] font-mono text-slate-600 break-all leading-tight font-bold tracking-tighter">{row.key}{keyDiffMap.get(row.key) && (<span className={`uppercase font-black text-[9px] ml-1 px-1.5 py-0.5 rounded-sm w-fit inline-block ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{keyDiffMap.get(row.key)?.state}</span>)}</div>
                               </div>
 
                               {/* Source Column */}
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Source String</label>
-                                <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border ${row.pastSourceValue !== row.sourceValue ? 'border-rose-300 ring-8 ring-rose-500/5 bg-rose-500/5' : 'border-slate-100/50 shadow-inner'} whitespace-pre-wrap text-slate-700 leading-relaxed font-black`}>
+                              <div className="w-full relative group p-2">
+                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-1 block tracking-widest">Source String</label>
+                                <div className={`text-sm p-1.5 rounded-sm bg-slate-50/50 border ${row.pastSourceValue !== row.sourceValue ? 'border-rose-300 ring-1 ring-rose-500/20 bg-rose-500/5' : 'border-slate-200'} whitespace-pre-wrap text-slate-700 leading-snug font-medium h-full`}>
                                   {row.sourceValue}
                                   {row.pastSourceValue !== row.sourceValue && (<>
-                                    <span className="absolute -top-3 -right-3 max-lg:hidden group-hover:hidden bg-rose-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">
+                                    <span className="absolute -top-2 max-lg:top-2 right-1 max-lg:hidden group-hover:hidden bg-rose-500 text-[8px] font-black text-white px-2 py-0.5 rounded-sm uppercase shadow-sm">
                                       Unconfirm
                                     </span>
                                     <button
@@ -1018,19 +1033,19 @@ const App: React.FC<AppProps> = (props) => {
                                         const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
                                         updateActiveProject({ rows: newRows });
                                       }}
-                                      className="absolute -top-3 -right-3 lg:hidden group-hover:block bg-lime-500 text-[9px] lg:text-[10px] font-black text-white px-10 py-1.5 rounded-full border-4 border-white uppercase whitespace-nowrap shadow-2xl"
+                                      className="absolute -top-2 max-lg:top-2 right-1 lg:hidden group-hover:block bg-lime-500 text-[8px] font-black text-white px-3 py-0.5 rounded-sm uppercase whitespace-nowrap shadow-sm cursor-pointer"
                                     >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                      <svg className="w-3 h-3 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                     </button>
                                   </>)}
                                 </div>
                               </div>
 
                               {/* Target Column */}
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
+                              <div className="w-full relative group p-2">
+                                <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-1 block tracking-widest">Target Locale</label>
                                 <textarea
-                                  className={`w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black ${row.targetValue !== row.originalTargetValue ? 'border-amber-300 ring-8 ring-amber-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}`}
+                                  className={`w-full h-full text-sm p-1.5 rounded-sm border outline-none transition-all min-h-[40px] leading-snug font-medium ${row.targetValue !== row.originalTargetValue ? 'border-amber-300 ring-1 ring-amber-500/20 bg-white' : 'border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500/30'}`}
                                   value={row.targetValue}
                                   style={{ resize: 'none' }}
                                   onChange={e => {
@@ -1053,27 +1068,27 @@ const App: React.FC<AppProps> = (props) => {
                                   placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
                                 />
                                 {row.targetValue !== row.originalTargetValue && (
-                                  <span className="absolute -top-3 -right-3 bg-amber-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">Modified</span>
+                                  <span className="absolute -top-2 max-lg:top-2 right-1 bg-amber-500 text-[8px] font-black text-white px-2 py-0.5 rounded-sm uppercase shadow-sm">Modified</span>
                                 )}
                               </div>
 
                               {/* AI Column */}
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-purple-500 uppercase mb-3 block tracking-widest">AI Suggestion</label>
+                              <div className="w-full relative group p-2">
+                                <label className="lg:hidden text-[9px] font-black text-purple-500 uppercase mb-1 block tracking-widest">AI Suggestion</label>
                                 <div
-                                  className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] min-h-[120px] lg:min-h-[160px] whitespace-pre-wrap transition-all leading-relaxed font-bold ${row.aiSuggestion && !rowAiLoading[row.key]
-                                    ? 'bg-indigo-50/50 border border-indigo-100 text-indigo-900 italic shadow-xl shadow-indigo-500/10'
+                                  className={`text-sm p-1.5 rounded-sm min-h-[40px] h-full whitespace-pre-wrap transition-all leading-snug font-medium ${row.aiSuggestion && !rowAiLoading[row.key]
+                                    ? 'bg-indigo-50/50 border border-indigo-200 text-indigo-900 italic'
                                     : rowAiTemp[row.key] && rowAiLoading[row.key]
-                                      ? 'bg-slate-50/50 border border-slate-100 text-indigo-900 italic shadow-xl shadow-slate-500/10'
-                                      : 'bg-slate-50/30 border border-dashed border-slate-200 text-slate-200 flex items-center justify-center font-black text-[10px] uppercase tracking-widest opacity-50'}`}
+                                      ? 'bg-slate-50/50 border border-slate-200 text-indigo-900 italic'
+                                      : 'bg-slate-50/50 border border-dashed border-slate-200 text-slate-400 flex items-center justify-center font-black text-[9px] uppercase tracking-widest opacity-80'}`}
                                 >
                                   {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="w-2 h-2 centered relative">
-                                    <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
-                                    <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                    <div className="absolute inset-0 border-[4px] border-indigo-50 rounded-full"></div>
+                                    <div className="absolute inset-0 border-[4px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                                   </div></div> : (rowAiLoading[row.key] ?
-                                    <div>Awaiting AI<div className="w-10 h-10 centered relative">
-                                      <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
-                                      <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                    <div className="flex items-center gap-2">Awaiting AI<div className="w-4 h-4 relative">
+                                      <div className="absolute inset-0 border-[2px] border-indigo-50 rounded-full"></div>
+                                      <div className="absolute inset-0 border-[2px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                                     </div></div> : "No AI"))}
                                 </div>
                                 {row.aiSuggestion && !rowAiLoading[row.key] ? (
@@ -1083,18 +1098,18 @@ const App: React.FC<AppProps> = (props) => {
                                         const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
                                         updateActiveProject({ rows: newRows });
                                       }}
-                                      className="absolute top-3 right-20 lg:top-6 lg:right-17 bg-white text-rose-600 font-black p-2 lg:p-3 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-rose-50 active:scale-75 hover:bg-rose-50"
+                                      className="absolute top-1 right-10 bg-white text-rose-600 font-black p-1.5 rounded shadow-sm opacity-80 lg:opacity-0 lg:group-hover:opacity-100 transition-all border border-rose-100 hover:bg-rose-50 cursor-pointer"
                                     >
-                                      <svg className="w-5 h-5 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
                                     </button>
                                     <button
                                       onClick={() => {
                                         const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
                                         updateActiveProject({ rows: newRows });
                                       }}
-                                      className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-white text-lime-600 p-3 lg:p-4 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-lime-50 active:scale-75 hover:bg-lime-50"
+                                      className="absolute top-1 right-1 bg-white text-lime-600 p-1.5 rounded shadow-sm opacity-80 lg:opacity-0 lg:group-hover:opacity-100 transition-all border border-lime-100 hover:bg-lime-50 cursor-pointer"
                                     >
-                                      <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                     </button>
                                   </div>
                                 ) : (
@@ -1128,9 +1143,9 @@ const App: React.FC<AppProps> = (props) => {
                                       } finally {
                                       }
                                     }}
-                                    className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-indigo-600 text-white p-3 lg:p-4 rounded-2xl shadow-2xl opacity-100 lg:opacity-0 lg:group-hover:opacity-100 font-black transition-all border border-indigo-50 active:scale-75 hover:bg-indigo-700"
+                                    className="absolute top-1 right-1 bg-indigo-600 text-white p-1.5 rounded shadow-sm opacity-100 lg:opacity-0 lg:group-hover:opacity-100 font-black transition-all hover:bg-indigo-700 cursor-pointer"
                                   >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                   </button>
                                 )}
                               </div>
