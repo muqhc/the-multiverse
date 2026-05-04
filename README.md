@@ -2,6 +2,12 @@
 
 fully browser app to translate locale file in github, with ai suggestion feature (if you want to use ai, remember it's just reference!)
 
+## web page
+
+- github pages link: https://muqhc.github.io/the-multiverse/
+
+- if you don't like rounded sheet (because of much margin) and want view like spreadsheet, go https://muqhc.github.io/the-multiverse?ui=spreadsheet
+
 ## note
 
 - since 2026-04-26, using IndexedDB, not LocalStorage
