@@ -442,6 +442,7 @@ const App: React.FC<AppProps> = (props) => {
         )) &&
         (
           ((!(searchTerm.includes("#dupdated") || searchTerm.includes("#dupd"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue)) &&
+          ((!(searchTerm.includes("#dchanged") || searchTerm.includes("#dcha"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue && dr.pastSourceValue !== dr.sourceValue)) &&
           ((!(searchTerm.includes("#dtranslated") || searchTerm.includes("#dtra"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue && dr.pastTargetValue === dr.sourceValue)) &&
           ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || dr && dr.state === DiffRowState.MODIFIED) &&
           ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || dr && dr.state === DiffRowState.ADDED) &&
@@ -480,6 +481,7 @@ const App: React.FC<AppProps> = (props) => {
         )) &&
         (
           ((!(searchTerm.includes("#dupdated") || searchTerm.includes("#dupd"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue)) &&
+          ((!(searchTerm.includes("#dchanged") || searchTerm.includes("#dcha"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue && r.pastSourceValue !== r.sourceValue)) &&
           ((!(searchTerm.includes("#dtranslated") || searchTerm.includes("#dtra"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue && r.pastTargetValue === r.sourceValue)) &&
           ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || r.state === DiffRowState.MODIFIED) &&
           ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || r.state === DiffRowState.ADDED) &&
