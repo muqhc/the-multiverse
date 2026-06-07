@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { GitHubConfig, TranslationRow, GeminiModel, Project, GlobalState, GlobalSettings, ValueType, ViewMode, DiffRowState, Diff, DiffRow } from './types';
-import { flattenObject, unflattenObject, saveToLocal, loadFromLocalCallback, downloadFile, importProjectFromText, compressText } from './utils';
+import { flattenObject, unflattenObject, saveToLocal, loadFromLocalCallback, downloadFile, importProjectFromText, compressText, createEmptyProject } from './utils';
 import { GitHubService } from './services/githubService';
 import { getTranslationSuggestions } from './services/geminiService';
 import { Virtuoso } from 'react-virtuoso';
@@ -96,19 +96,6 @@ const App: React.FC<AppProps> = (props) => {
     if (activeProject) setEditNameValue(activeProject.name);
   }, [activeProject?.id]);
 
-  function createEmptyProject(name: string): Project {
-    return {
-      id: crypto.randomUUID(),
-      name,
-      config: { owner: '', repo: '', branch: 'main', sourcePath: '', targetPath: '' },
-      rows: [],
-      selectedModel: Object.values(GeminiModel)[0],
-      lastUpdated: Date.now(),
-      originalTargetData: {},
-      note: '',
-      diffStack: [],
-    };
-  }
 
   const handleCreateProject = () => {
     const name = prompt("Project Name:", "New Localization Project") || "New Project";
