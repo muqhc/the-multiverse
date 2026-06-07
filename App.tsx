@@ -797,23 +797,7 @@ const App: React.FC<AppProps> = (props) => {
 
             <div className={`workspace-wrapper ${isSpreadsheetMode ? 'spreadsheet-layout' : ''}`}>
               <div className="filter-bar">
-                {isSpreadsheetMode && (
-                  <div className="mobile-stats-row">
-                    <div className="mobile-stats-wrapper">
-                      {unconfirmedCount > 0 && <span className="search-stats-badge unconfirmed">{unconfirmedCount} Unconfirmed</span>}
-                      {modifiedCount > 0 && <span className="search-stats-badge modified">{modifiedCount} Modified</span>}
-                      <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : filteredDiffRows.length || 0} Entries</span>
-                    </div>
-                    <button
-                      onClick={() => setIsSearchCollapsedMobile(!isSearchCollapsedMobile)}
-                      className="mobile-search-toggle"
-                    >
-                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    </button>
-                  </div>
-                )}
-
-                <div className="search-input-wrapper" style={{ display: (isSpreadsheetMode && isSearchCollapsedMobile) ? "none" : "block" }}>
+                <div className="search-input-wrapper">
                   <input
                     type="text"
                     placeholder="Search strings, keys, or translations..."
@@ -890,14 +874,6 @@ const App: React.FC<AppProps> = (props) => {
                   )}
 
                 </div>
-                {(!isSpreadsheetMode) && (
-                  <div className="search-stats-container no-scrollbar">
-                    {unconfirmedCount > 0 && <span className="search-stats-badge unconfirmed">{unconfirmedCount} Unconfirmed</span>}
-                    {modifiedCount > 0 && <span className="search-stats-badge modified">{modifiedCount} Modified</span>}
-                    <span className="search-stats-divider"></span>
-                    <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : filteredDiffRows.length || 0} Entries</span>
-                  </div>
-                )}
               </div>
 
               {/* PROJECT CONSOLE */}
@@ -917,7 +893,7 @@ const App: React.FC<AppProps> = (props) => {
                 </div>
               </div>
 
-              <div className="rows-viewport" style={{ padding: isSpreadsheetMode ? 0 : undefined }}>
+              <div className="rows-viewport">
                 {viewMode === ViewMode.DIFFERENCES ? (
                   (!activeDiff || activeDiff.rows.length === 0) ? (
                     <div className="empty-view">
@@ -940,134 +916,70 @@ const App: React.FC<AppProps> = (props) => {
                           style={{ height: "100%", minHeight: "600px" }}
                           data={filteredDiffRows}
                           itemContent={(_, row) => {
-                            if (isSpreadsheetMode) {
-                              return (
-                                <div key={row.key} className={`row-card ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
-                                  <div className="row-cell-sp">
-                                    <label className="row-label-mobile">Entry Path</label>
-                                    <div className="key-badge-container-sp">
-                                      {row.key}
-                                      <span className={`diff-badge ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
-                                        {row.state}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="row-cell-sp relative group">
-                                    <label className="row-label-mobile">Past Source Value</label>
-                                    <div className="source-box-sp">{row.sourceValue}</div>
-                                  </div>
-                                  <div className="row-cell-sp relative group">
-                                    <label className="row-label-mobile">Updated Source Value</label>
-                                    <div className={`source-box-sp ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'changed' : ''}`}>{row.updatedSourceValue}</div>
-                                    {(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) && (
-                                      <span className="badge-flag-sp changed">CHANGED</span>
-                                    )}
-                                  </div>
-                                  <div className="row-cell-sp relative group">
-                                    <label className="row-label-mobile">Target Locale</label>
-                                    <textarea
-                                      className={`edit-textarea-sp ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'diff-modified' : 'diff-translated') : ''} ${viewingPast[row.key] ? 'bg-rose-50' : ''}`}
-                                      value={viewingPast[row.key] ? row.pastTargetValue : row.targetValue}
-                                      disabled={isConfirming || row.state === DiffRowState.REMOVED || viewingPast[row.key]}
-                                      onChange={e => {
-                                        if (!isConfirming && !viewingPast[row.key] && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
-                                          const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
-
-                                          let newStack = activeProject.diffStack;
-                                          if (activeProject.diffStack && activeProject.diffStack.length > 0) {
-                                            newStack = [...activeProject.diffStack];
-                                            const lastDiff = { ...newStack[newStack.length - 1] };
-                                            const diffIdx = lastDiff.rows.findIndex(d => d.key === row.key);
-                                            if (diffIdx !== -1) {
-                                              lastDiff.rows[diffIdx] = { ...lastDiff.rows[diffIdx], targetValue: e.target.value };
-                                              newStack[newStack.length - 1] = lastDiff;
-                                            }
-                                          }
-                                          updateActiveProject({ rows: newRows, diffStack: newStack });
-                                        }
-                                      }}
-                                    />
-                                    {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (row.pastTargetValue !== row.sourceValue ? (<div className="group">
-                                      {viewingPast[row.key] || <span className="badge-flag-sp updated">UPDATED</span>}
-                                      <button
-                                        className="unconfirm-btn-sp"
-                                        onClick={e => {
-                                          setViewingPast({ ...viewingPast, [row.key]: !viewingPast[row.key] })
-                                        }}
-                                      >
-                                        {viewingPast[row.key] ? "VIEW CURRENT" : "VIEW PAST"}
-                                      </button>
-                                    </div>) : (
-                                      <span className="badge-flag-sp translated">TRANSLATED</span>
-                                    ))}
+                            return (
+                              <div key={row.key} className={`row-card diff-layout ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                <div className="key-cell">
+                                  <label className="row-label-mobile">Entry Path</label>
+                                  <div className="key-badge-container">
+                                    {row.key}
+                                    <span className={`diff-badge ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                      {row.state}
+                                    </span>
                                   </div>
                                 </div>
-                              );
-                            } else {
-                              return (
-                                <div key={row.key} className={`row-card diff-layout ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
-                                  <div className="key-cell">
-                                    <label className="row-label-mobile">Entry Path</label>
-                                    <div className="key-badge-container">
-                                      {row.key}
-                                      <span className={`diff-badge ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
-                                        {row.state}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="value-cell">
-                                    <label className="row-label-mobile">Past Source Value</label>
-                                    <div className="source-box">{row.sourceValue}</div>
-                                  </div>
-                                  <div className="value-cell">
-                                    <label className="row-label-mobile">Updated Source Value</label>
-                                    <div className={`source-box ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'changed' : ''}`}>{row.updatedSourceValue}</div>
-                                    {(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) && (
-                                      <span className="badge-flag changed">CHANGED</span>
-                                    )}
-                                  </div>
-                                  <div className="value-cell view-past-toggle-group">
-                                    <label className="row-label-mobile">Target Locale</label>
-                                    <textarea
-                                      className={`edit-textarea ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'diff-modified' : 'diff-translated') : ''} ${viewingPast[row.key] ? 'bg-rose' : ''}`}
-                                      value={viewingPast[row.key] ? row.pastTargetValue : row.targetValue}
-                                      disabled={isConfirming || row.state === DiffRowState.REMOVED || viewingPast[row.key]}
-                                      onChange={e => {
-                                        if (!isConfirming && !viewingPast[row.key] && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
-                                          const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
-
-                                          let newStack = activeProject.diffStack;
-                                          if (activeProject.diffStack && activeProject.diffStack.length > 0) {
-                                            newStack = [...activeProject.diffStack];
-                                            const lastDiff = { ...newStack[newStack.length - 1] };
-                                            const diffIdx = lastDiff.rows.findIndex(d => d.key === row.key);
-                                            if (diffIdx !== -1) {
-                                              lastDiff.rows[diffIdx] = { ...lastDiff.rows[diffIdx], targetValue: e.target.value };
-                                              newStack[newStack.length - 1] = lastDiff;
-                                            }
-                                          }
-                                          updateActiveProject({ rows: newRows, diffStack: newStack });
-                                        }
-                                      }}
-                                    />
-                                    {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (row.pastTargetValue !== row.sourceValue ? (<div className="group">
-                                      {viewingPast[row.key] || <span className="badge-flag updated">UPDATED</span>}
-                                      <button
-                                        className={`view-past-toggle-btn ${viewingPast[row.key] ? 'visible' : ''}`}
-                                        onClick={e => {
-                                          setViewingPast({ ...viewingPast, [row.key]: !viewingPast[row.key] })
-                                        }}
-                                      >
-                                        {viewingPast[row.key] ? "VIEW CURRENT" : "VIEW PAST"}
-                                      </button>
-                                    </div>) : (
-                                      <span className="badge-flag translated">TRANSLATED</span>
-                                    ))}
-                                  </div>
+                                <div className="value-cell">
+                                  <label className="row-label-mobile">Past Source Value</label>
+                                  <div className="source-box">{row.sourceValue}</div>
                                 </div>
-                              );
-                            }
-                          }}
+                                <div className="value-cell">
+                                  <label className="row-label-mobile">Updated Source Value</label>
+                                  <div className={`source-box ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'changed' : ''}`}>{row.updatedSourceValue}</div>
+                                  {(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) && (
+                                    <span className="badge-flag changed">CHANGED</span>
+                                  )}
+                                </div>
+                                <div className="value-cell view-past-toggle-group">
+                                  <label className="row-label-mobile">Target Locale</label>
+                                  <textarea
+                                    className={`edit-textarea ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'diff-modified' : 'diff-translated') : ''} ${viewingPast[row.key] ? 'bg-rose' : ''}`}
+                                    value={viewingPast[row.key] ? row.pastTargetValue : row.targetValue}
+                                    disabled={isConfirming || row.state === DiffRowState.REMOVED || viewingPast[row.key]}
+                                    onChange={e => {
+                                      if (!isConfirming && !viewingPast[row.key] && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
+                                        const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
+
+                                        let newStack = activeProject.diffStack;
+                                        if (activeProject.diffStack && activeProject.diffStack.length > 0) {
+                                          newStack = [...activeProject.diffStack];
+                                          const lastDiff = { ...newStack[newStack.length - 1] };
+                                          const diffIdx = lastDiff.rows.findIndex(d => d.key === row.key);
+                                          if (diffIdx !== -1) {
+                                            lastDiff.rows[diffIdx] = { ...lastDiff.rows[diffIdx], targetValue: e.target.value };
+                                            newStack[newStack.length - 1] = lastDiff;
+                                          }
+                                        }
+                                        updateActiveProject({ rows: newRows, diffStack: newStack });
+                                      }
+                                    }}
+                                  />
+                                  {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (row.pastTargetValue !== row.sourceValue ? (<div className="group">
+                                    {viewingPast[row.key] || <span className="badge-flag updated">UPDATED</span>}
+                                    <button
+                                      className={`view-past-toggle-btn ${viewingPast[row.key] ? 'visible' : ''}`}
+                                      onClick={e => {
+                                        setViewingPast({ ...viewingPast, [row.key]: !viewingPast[row.key] })
+                                      }}
+                                    >
+                                      {viewingPast[row.key] ? "VIEW CURRENT" : "VIEW PAST"}
+                                    </button>
+                                  </div>) : (
+                                    <span className="badge-flag translated">TRANSLATED</span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                          }
                         />
                       </div>
                     </div>
@@ -1105,300 +1017,153 @@ const App: React.FC<AppProps> = (props) => {
                           style={{ height: "100%", minHeight: "600px" }}
                           data={filteredRows}
                           itemContent={(_, row) => {
-                            if (isSpreadsheetMode) {
-                              return (
-                                <div key={row.key} className={`row-card ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}>
-                                  {/* Key Column */}
-                                  <div className="row-cell-sp">
-                                    <label className="row-label-mobile">Entry Path</label>
-                                    <div className="key-badge-container-sp">
-                                      {row.key}
-                                      {keyDiffMap.get(row.key) && (
-                                        <span className={`diff-badge ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'added' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
-                                          {keyDiffMap.get(row.key)?.state}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Source Column */}
-                                  <div className="row-cell-sp relative group">
-                                    <label className="row-label-mobile">Source String</label>
-                                    <div className={`source-box-sp ${row.pastSourceValue !== row.sourceValue ? 'unconfirm' : ''}`}>
-                                      {row.sourceValue}
-                                      {row.pastSourceValue !== row.sourceValue && (<>
-                                        <span className="badge-flag-sp unconfirmed">
-                                          Unconfirm
-                                        </span>
-                                        <button
-                                          onClick={() => {
-                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
-                                            updateActiveProject({ rows: newRows });
-                                          }}
-                                          className="unconfirm-btn-sp"
-                                        >
-                                          <svg style={{ width: "0.75rem", height: "0.75rem", display: "inline-block" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                        </button>
-                                      </>)}
-                                    </div>
-                                  </div>
-
-                                  {/* Target Column */}
-                                  <div className="row-cell-sp relative group">
-                                    <label className="row-label-mobile">Target Locale</label>
-                                    <textarea
-                                      className={`edit-textarea-sp ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}
-                                      value={row.targetValue}
-                                      onChange={e => {
-                                        const newRows = activeProject.rows.map(r => r.key === row.key ? {
-                                          ...r,
-                                          targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
-                                        } : r);
-                                        updateActiveProject({ rows: newRows });
-                                      }}
-                                      onKeyDown={e => {
-                                        if (e.key === 'Tab') {
-                                          e.preventDefault();
-                                          const newRows = activeProject.rows.map(r => r.key === row.key ? {
-                                            ...r,
-                                            targetValue: row.originalTargetValue
-                                          } : r);
-                                          updateActiveProject({ rows: newRows });
-                                        }
-                                      }}
-                                      placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
-                                    />
-                                    {row.targetValue !== row.originalTargetValue && (
-                                      <span className="badge-flag-sp modified">Modified</span>
-                                    )}
-                                  </div>
-
-                                  {/* AI Column */}
-                                  <div className="row-cell-sp relative group">
-                                    <label className="row-label-mobile">AI Suggestion</label>
-                                    <div
-                                      className={`ai-suggest-box-sp ${row.aiSuggestion && !rowAiLoading[row.key] ? 'has-suggestion' : 'no-suggestion'}`}
-                                    >
-                                      {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="ai-loading-container" style={{ position: "relative", width: "1rem", height: "1rem", display: "inline-block" }}>
-                                        <div className="spinner-track" style={{ borderWidth: "2px" }}></div>
-                                        <div className="spinner-hand animate-spin" style={{ borderWidth: "2px" }}></div>
-                                      </div></div> : (rowAiLoading[row.key] ?
-                                        <div className="ai-loading-container" style={{ flexDirection: "row" }}>
-                                          Awaiting AI
-                                          <div style={{ position: "relative", width: "1rem", height: "1rem", display: "inline-block", marginLeft: "0.25rem" }}>
-                                            <div className="spinner-track" style={{ borderWidth: "2px" }}></div>
-                                            <div className="spinner-hand animate-spin" style={{ borderWidth: "2px" }}></div>
-                                          </div>
-                                        </div> : "No AI"))}
-                                    </div>
-                                    {row.aiSuggestion && !rowAiLoading[row.key] ? (
-                                      <div>
-                                        <button
-                                          onClick={() => {
-                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
-                                            updateActiveProject({ rows: newRows });
-                                          }}
-                                          className="ai-action-btn-sp discard"
-                                        >
-                                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
-                                            updateActiveProject({ rows: newRows });
-                                          }}
-                                          className="ai-action-btn-sp accept"
-                                        >
-                                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      rowAiLoading[row.key] || <button
-                                        onClick={async () => {
-                                          const updatedRows = [...activeProject.rows];
-
-                                          if (!settings.geminiApiKey) {
-                                            alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
-                                            setShowSettings(true);
-                                            return;
-                                          }
-                                          try {
-                                            setRowAiLoading({ ...rowAiLoading, [row.key]: true });
-                                            const suggestions = await getTranslationSuggestions(
-                                              activeProject.selectedModel, settings.geminiApiKey,
-                                              activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
-                                              activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
-                                              [{ key: row.key, value: row.sourceValue }],
-                                              activeProject.note?.replace("\n", ", ")
-                                            );
-                                            setRowAiLoading({ ...rowAiLoading, [row.key]: false });
-                                            Object.keys(suggestions).forEach(key => {
-                                              const rowIndex = updatedRows.findIndex(r => r.key === key);
-                                              if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
-                                            });
-                                            updateActiveProject({ rows: updatedRows });
-                                          } catch (error) {
-                                            console.error("Error fetching AI suggestion:", error);
-                                            alert("⚠️ Error fetching AI suggestion. Please check the console for details.");
-                                          } finally {
-                                          }
-                                        }}
-                                        className="ai-suggest-trigger-btn-sp"
-                                      >
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                      </button>
+                            return (
+                              <div key={row.key} className={`row-card ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}>
+                                {/* Key Column */}
+                                <div className="key-cell">
+                                  <label className="row-label-mobile">Entry Path</label>
+                                  <div className="key-badge-container">
+                                    {row.key}
+                                    {keyDiffMap.get(row.key) && (
+                                      <span className={`diff-badge ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'added' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                        {keyDiffMap.get(row.key)?.state}
+                                      </span>
                                     )}
                                   </div>
                                 </div>
-                              );
-                            } else {
-                              return (
-                                <div key={row.key} className={`row-card ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}>
-                                  {/* Key Column */}
-                                  <div className="key-cell">
-                                    <label className="row-label-mobile">Entry Path</label>
-                                    <div className="key-badge-container">
-                                      {row.key}
-                                      {keyDiffMap.get(row.key) && (
-                                        <span className={`diff-badge ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'added' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
-                                          {keyDiffMap.get(row.key)?.state}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
 
-                                  {/* Source Column */}
-                                  <div className="value-cell">
-                                    <label className="row-label-mobile">Source String</label>
-                                    <div className={`source-box ${row.pastSourceValue !== row.sourceValue ? 'unconfirm' : ''}`}>
-                                      {row.sourceValue}
-                                      {row.pastSourceValue !== row.sourceValue && (<>
-                                        <span className="badge-flag unconfirmed">
-                                          Unconfirm
-                                        </span>
-                                        <button
-                                          onClick={() => {
-                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
-                                            updateActiveProject({ rows: newRows });
-                                          }}
-                                          className="unconfirm-btn-overlay"
-                                        >
-                                          <svg style={{ width: "1.25rem", height: "1.25rem", display: "inline-block" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                        </button>
-                                      </>)}
-                                    </div>
-                                  </div>
-
-                                  {/* Target Column */}
-                                  <div className="value-cell">
-                                    <label className="row-label-mobile">Target Locale</label>
-                                    <textarea
-                                      className={`edit-textarea ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}
-                                      value={row.targetValue}
-                                      onChange={e => {
-                                        const newRows = activeProject.rows.map(r => r.key === row.key ? {
-                                          ...r,
-                                          targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
-                                        } : r);
-                                        updateActiveProject({ rows: newRows });
-                                      }}
-                                      onKeyDown={e => {
-                                        if (e.key === 'Tab') {
-                                          e.preventDefault();
-                                          const newRows = activeProject.rows.map(r => r.key === row.key ? {
-                                            ...r,
-                                            targetValue: row.originalTargetValue
-                                          } : r);
+                                {/* Source Column */}
+                                <div className="value-cell">
+                                  <label className="row-label-mobile">Source String</label>
+                                  <div className={`source-box ${row.pastSourceValue !== row.sourceValue ? 'unconfirm' : ''}`}>
+                                    {row.sourceValue}
+                                    {row.pastSourceValue !== row.sourceValue && (<>
+                                      <span className="badge-flag unconfirmed">
+                                        Unconfirm
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
                                           updateActiveProject({ rows: newRows });
-                                        }
-                                      }}
-                                      placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
-                                    />
-                                    {row.targetValue !== row.originalTargetValue && (
-                                      <span className="badge-flag modified">Modified</span>
-                                    )}
-                                  </div>
-
-                                  {/* AI Column */}
-                                  <div className="value-cell">
-                                    <label className="row-label-mobile">AI Suggestion</label>
-                                    <div
-                                      className={`ai-suggest-box ${row.aiSuggestion && !rowAiLoading[row.key] ? 'has-suggestion' : (rowAiTemp[row.key] && rowAiLoading[row.key] ? 'loading-temp' : 'no-suggestion')}`}
-                                    >
-                                      {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="ai-loading-container" style={{ position: "relative", width: "1rem", height: "1rem" }}>
-                                        <div className="spinner-track" style={{ borderWidth: "2px" }}></div>
-                                        <div className="spinner-hand animate-spin" style={{ borderWidth: "2px" }}></div>
-                                      </div></div> : (rowAiLoading[row.key] ?
-                                        <div className="ai-loading-container">
-                                          Awaiting AI
-                                          <div style={{ position: "relative", width: "2rem", height: "2rem" }}>
-                                            <div className="spinner-track" style={{ borderWidth: "4px" }}></div>
-                                            <div className="spinner-hand animate-spin" style={{ borderWidth: "4px" }}></div>
-                                          </div>
-                                        </div> : "No AI"))}
-                                    </div>
-                                    {row.aiSuggestion && !rowAiLoading[row.key] ? (
-                                      <div>
-                                        <button
-                                          onClick={() => {
-                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
-                                            updateActiveProject({ rows: newRows });
-                                          }}
-                                          className="ai-action-btn discard"
-                                        >
-                                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
-                                            updateActiveProject({ rows: newRows });
-                                          }}
-                                          className="ai-action-btn accept"
-                                        >
-                                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      rowAiLoading[row.key] || <button
-                                        onClick={async () => {
-                                          const updatedRows = [...activeProject.rows];
-
-                                          if (!settings.geminiApiKey) {
-                                            alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
-                                            setShowSettings(true);
-                                            return;
-                                          }
-                                          try {
-                                            setRowAiLoading({ ...rowAiLoading, [row.key]: true });
-                                            const suggestions = await getTranslationSuggestions(
-                                              activeProject.selectedModel, settings.geminiApiKey,
-                                              activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
-                                              activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
-                                              [{ key: row.key, value: row.sourceValue }],
-                                              activeProject.note?.replace("\n", ", ")
-                                            );
-                                            setRowAiLoading({ ...rowAiLoading, [row.key]: false });
-                                            Object.keys(suggestions).forEach(key => {
-                                              const rowIndex = updatedRows.findIndex(r => r.key === key);
-                                              if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
-                                            });
-                                            updateActiveProject({ rows: updatedRows });
-                                          } catch (error) {
-                                            console.error("Error fetching AI suggestion:", error);
-                                            alert("⚠️ Error fetching AI suggestion. Please check the console for details.");
-                                          } finally {
-                                          }
                                         }}
-                                        className="ai-suggest-trigger-btn"
+                                        className="unconfirm-btn-overlay"
                                       >
-                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                        <svg style={{ width: "1.25rem", height: "1.25rem", display: "inline-block" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                       </button>
-                                    )}
+                                    </>)}
                                   </div>
                                 </div>
-                              );
-                            }
-                          }}
+
+                                {/* Target Column */}
+                                <div className="value-cell">
+                                  <label className="row-label-mobile">Target Locale</label>
+                                  <textarea
+                                    className={`edit-textarea ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}
+                                    value={row.targetValue}
+                                    onChange={e => {
+                                      const newRows = activeProject.rows.map(r => r.key === row.key ? {
+                                        ...r,
+                                        targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
+                                      } : r);
+                                      updateActiveProject({ rows: newRows });
+                                    }}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Tab') {
+                                        e.preventDefault();
+                                        const newRows = activeProject.rows.map(r => r.key === row.key ? {
+                                          ...r,
+                                          targetValue: row.originalTargetValue
+                                        } : r);
+                                        updateActiveProject({ rows: newRows });
+                                      }
+                                    }}
+                                    placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
+                                  />
+                                  {row.targetValue !== row.originalTargetValue && (
+                                    <span className="badge-flag modified">Modified</span>
+                                  )}
+                                </div>
+
+                                {/* AI Column */}
+                                <div className="value-cell">
+                                  <label className="row-label-mobile">AI Suggestion</label>
+                                  <div
+                                    className={`ai-suggest-box ${row.aiSuggestion && !rowAiLoading[row.key] ? 'has-suggestion' : (rowAiTemp[row.key] && rowAiLoading[row.key] ? 'loading-temp' : 'no-suggestion')}`}
+                                  >
+                                    {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="ai-loading-container" style={{ position: "relative", width: "1rem", height: "1rem" }}>
+                                      <div className="spinner-track" style={{ borderWidth: "2px" }}></div>
+                                      <div className="spinner-hand animate-spin" style={{ borderWidth: "2px" }}></div>
+                                    </div></div> : (rowAiLoading[row.key] ?
+                                      <div className="ai-loading-container">
+                                        Awaiting AI
+                                        <div style={{ position: "relative", width: "2rem", height: "2rem" }}>
+                                          <div className="spinner-track" style={{ borderWidth: "4px" }}></div>
+                                          <div className="spinner-hand animate-spin" style={{ borderWidth: "4px" }}></div>
+                                        </div>
+                                      </div> : "No AI"))}
+                                  </div>
+                                  {row.aiSuggestion && !rowAiLoading[row.key] ? (
+                                    <div>
+                                      <button
+                                        onClick={() => {
+                                          const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
+                                          updateActiveProject({ rows: newRows });
+                                        }}
+                                        className="ai-action-btn discard"
+                                      >
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
+                                          updateActiveProject({ rows: newRows });
+                                        }}
+                                        className="ai-action-btn accept"
+                                      >
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    rowAiLoading[row.key] || <button
+                                      onClick={async () => {
+                                        const updatedRows = [...activeProject.rows];
+
+                                        if (!settings.geminiApiKey) {
+                                          alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
+                                          setShowSettings(true);
+                                          return;
+                                        }
+                                        try {
+                                          setRowAiLoading({ ...rowAiLoading, [row.key]: true });
+                                          const suggestions = await getTranslationSuggestions(
+                                            activeProject.selectedModel, settings.geminiApiKey,
+                                            activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
+                                            activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
+                                            [{ key: row.key, value: row.sourceValue }],
+                                            activeProject.note?.replace("\n", ", ")
+                                          );
+                                          setRowAiLoading({ ...rowAiLoading, [row.key]: false });
+                                          Object.keys(suggestions).forEach(key => {
+                                            const rowIndex = updatedRows.findIndex(r => r.key === key);
+                                            if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
+                                          });
+                                          updateActiveProject({ rows: updatedRows });
+                                        } catch (error) {
+                                          console.error("Error fetching AI suggestion:", error);
+                                          alert("⚠️ Error fetching AI suggestion. Please check the console for details.");
+                                        } finally {
+                                        }
+                                      }}
+                                      className="ai-suggest-trigger-btn"
+                                    >
+                                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+                          }
                         />
 
                       </div>
