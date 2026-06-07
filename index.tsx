@@ -4,13 +4,14 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { Project } from './types';
 import './index.css';
+import { decompressText } from './utils';
 
 const urlParams = new URLSearchParams(window.location.search);
 const loadedProjectFromURL = urlParams.get("import");
 const projectLoadQueue: Project[] = [];
 
 if (loadedProjectFromURL) {
-  projectLoadQueue.push(JSON.parse(decodeURIComponent(loadedProjectFromURL)) as Project);
+  projectLoadQueue.push(JSON.parse(decompressText(loadedProjectFromURL)) as Project);
 }
 
 const rootElement = document.getElementById('root');

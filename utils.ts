@@ -1,4 +1,5 @@
 import { walk } from "walkjs";
+import { compressToBase64, decompressFromBase64 } from "lz-string";
 import { IndexedDBDataItem, Meta, Project, ValueType, WeakStorage } from "./types";
 
 export function flattenObject(obj: any, prefix = ''): Record<string, ValueType> {
@@ -194,8 +195,8 @@ export function downloadFile(filename: string, content: string, contentType: str
   URL.revokeObjectURL(url);
 }
 
-export function importProject(content: string) {
-  const importedProject = parseJson(content) as Project;
+export function importProjectFromText(text: string) {
+  const importedProject = parseJson(text) as Project;
 
   if (!importedProject.id || !importedProject.name || !importedProject.config || !importedProject.rows) {
     throw new Error("Invalid project file format");
@@ -235,3 +236,10 @@ export function parallelLoadCallback<T, R>(queries: T[], loader: (query: T, call
   });
 }
 
+export function compressText(text: string) {
+  return compressToBase64(text);
+}
+
+export function decompressText(text: string) {
+  return decompressFromBase64(text);
+}

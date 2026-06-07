@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { GitHubConfig, TranslationRow, GeminiModel, Project, GlobalState, GlobalSettings, ValueType, ViewMode, DiffRowState, Diff, DiffRow } from './types';
-import { flattenObject, unflattenObject, saveToLocal, loadFromLocalCallback, downloadFile, importProject as importProjectFromText } from './utils';
+import { flattenObject, unflattenObject, saveToLocal, loadFromLocalCallback, downloadFile, importProjectFromText, compressText } from './utils';
 import { GitHubService } from './services/githubService';
 import { getTranslationSuggestions } from './services/geminiService';
 import { Virtuoso } from 'react-virtuoso';
@@ -33,7 +33,7 @@ const App: React.FC<AppProps> = (props) => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [driftDiff, setDriftDiff] = useState<Diff | null>(null);
   const [viewingPast, setViewingPast] = useState<Record<string, boolean>>({});
-  
+
   // Style mode toggles
   const [isSpreadsheetMode, setIsSpreadsheetMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('multiverse_ui_mode');
@@ -427,9 +427,9 @@ const App: React.FC<AppProps> = (props) => {
   const handleCopyLink = () => {
     if (!activeProject) return;
     const jsonString = JSON.stringify(activeProject, null, 2)
-    const url = window.location.origin + window.location.pathname + "?import=" + encodeURIComponent(jsonString);
+    const url = window.location.origin + window.location.pathname + "?import=" + compressText(jsonString);
     if (url.length > 2000) {
-      alert("Project is too large to be shared via URL! Use Export Project as File instead.");
+      alert(`Project is too large to be shared via URL! Use Export Project as File instead. (${url.length})`);
       return;
     }
     navigator.clipboard.writeText(url);
@@ -946,7 +946,7 @@ const App: React.FC<AppProps> = (props) => {
                                   <div className="row-cell-sp">
                                     <label className="row-label-mobile">Entry Path</label>
                                     <div className="key-badge-container-sp">
-                                      {row.key} 
+                                      {row.key}
                                       <span className={`diff-badge ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
                                         {row.state}
                                       </span>
@@ -1009,7 +1009,7 @@ const App: React.FC<AppProps> = (props) => {
                                   <div className="key-cell">
                                     <label className="row-label-mobile">Entry Path</label>
                                     <div className="key-badge-container">
-                                      {row.key} 
+                                      {row.key}
                                       <span className={`diff-badge ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
                                         {row.state}
                                       </span>

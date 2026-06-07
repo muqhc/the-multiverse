@@ -497,7 +497,7 @@ body {
 }
 
 .settings-btn:hover svg {
-  transform: rotate(90deg);
+  transform: rotate(360deg);
 }
 
 /* Main Content Canvas */
@@ -772,7 +772,8 @@ body {
 }
 
 .btn-danger-light:hover {
-  background-color: #ffe4e6;
+  background-color: #fca5a5;
+  cursor: pointer;
 }
 
 .btn-warning-light {
@@ -788,6 +789,7 @@ body {
 
 .btn-warning-light:hover {
   background-color: #fde68a;
+  cursor: pointer;
 }
 
 .btn-dark {
@@ -802,6 +804,7 @@ body {
 
 .btn-dark:hover {
   background-color: #000000;
+  cursor: pointer;
 }
 
 .btn-config {
