@@ -913,7 +913,7 @@ const App: React.FC<AppProps> = (props) => {
                       </div>
                       <div style={{ height: "100%", display: 'flex', flexDirection: 'column' }}>
                         <Virtuoso
-                          style={{ height: "100%", minHeight: "600px" }}
+                          style={{ height: "90%", minHeight: "600px" }}
                           data={filteredDiffRows}
                           itemContent={(_, row) => {
                             return (
@@ -1014,7 +1014,7 @@ const App: React.FC<AppProps> = (props) => {
 
                       <div style={{ height: "100%", display: 'flex', flexDirection: 'column' }}>
                         <Virtuoso
-                          style={{ height: "100%", minHeight: "600px" }}
+                          style={{ height: "90%", minHeight: "600px" }}
                           data={filteredRows}
                           itemContent={(_, row) => {
                             return (

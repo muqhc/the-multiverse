@@ -1291,6 +1291,7 @@ body {
   flex-direction: column;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
+  height: 100%;
 }
 
 @media (min-width: 1024px) {
@@ -1407,8 +1408,12 @@ body {
 /* Key Column Styling */
 .key-cell {
   width: 100%;
-  align-content: center;
-  overflow: hidden;
+  top: 0;
+  position: sticky;
+}
+
+.spreadsheet-layout .key-cell {
+  padding-left: 0.5rem;
 }
 
 .key-badge-container {
@@ -1423,6 +1428,8 @@ body {
   padding: 1rem;
   border-radius: var(--radius-2xl);
   border: 1px solid #f1f5f9;
+  top: 0;
+  position: sticky;
 }
 
 @media (min-width: 1024px) {
