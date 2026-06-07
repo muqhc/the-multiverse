@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { GitHubConfig, TranslationRow, GeminiModel, Project, GlobalState, GlobalSettings, ValueType, ViewMode, DiffRowState, Diff, DiffRow } from './types';
 import { flattenObject, unflattenObject, saveToLocal, loadFromLocalCallback, downloadFile, importProject as importProjectFromText } from './utils';
@@ -34,6 +33,15 @@ const App: React.FC<AppProps> = (props) => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [driftDiff, setDriftDiff] = useState<Diff | null>(null);
   const [viewingPast, setViewingPast] = useState<Record<string, boolean>>({});
+  
+  // Style mode toggles
+  const [isSpreadsheetMode, setIsSpreadsheetMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('multiverse_ui_mode');
+    if (saved) return saved === 'spreadsheet';
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('ui') === 'spreadsheet';
+  });
+  const [isSearchCollapsedMobile, setIsSearchCollapsedMobile] = useState(true);
 
   // Load from Browser Storage
   useEffect(() => {
@@ -63,6 +71,11 @@ const App: React.FC<AppProps> = (props) => {
       saveToLocal(STORAGE_KEY, { projects, activeProjectId, settings });
     }
   }, [projects, activeProjectId, settings]);
+
+  // Persist style mode choice
+  useEffect(() => {
+    localStorage.setItem('multiverse_ui_mode', isSpreadsheetMode ? 'spreadsheet' : 'rounded');
+  }, [isSpreadsheetMode]);
 
   useEffect(() => {
     setViewingPast({});
@@ -443,7 +456,7 @@ const App: React.FC<AppProps> = (props) => {
         (
           ((!(searchTerm.includes("#dupdated") || searchTerm.includes("#dupd"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue)) &&
           ((!(searchTerm.includes("#dchanged") || searchTerm.includes("#dcha"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue && dr.pastSourceValue !== dr.sourceValue)) &&
-          ((!(searchTerm.includes("#dtranslated") || searchTerm.includes("#dtra"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue && dr.pastTargetValue === dr.sourceValue)) &&
+          ((!(searchTerm.includes("#dtranslated") || searchTerm.includes("#dtra"))) || dr && (dr.pastTargetValue && dr.targetValue !== dr.pastTargetValue && dr.pastTargetValue === r.sourceValue)) &&
           ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || dr && dr.state === DiffRowState.MODIFIED) &&
           ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || dr && dr.state === DiffRowState.ADDED) &&
           ((!(searchTerm.includes("#modified") || searchTerm.includes("#mod"))) || r.targetValue !== r.originalTargetValue) &&
@@ -481,7 +494,6 @@ const App: React.FC<AppProps> = (props) => {
         )) &&
         (
           ((!(searchTerm.includes("#dupdated") || searchTerm.includes("#dupd"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue)) &&
-          ((!(searchTerm.includes("#dchanged") || searchTerm.includes("#dcha"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue && r.pastSourceValue !== r.sourceValue)) &&
           ((!(searchTerm.includes("#dtranslated") || searchTerm.includes("#dtra"))) || (r.pastTargetValue && r.targetValue !== r.pastTargetValue && r.pastTargetValue === r.sourceValue)) &&
           ((!(searchTerm.includes("#dmodified") || searchTerm.includes("#dmod"))) || r.state === DiffRowState.MODIFIED) &&
           ((!(searchTerm.includes("#dadded") || searchTerm.includes("#dadd"))) || r.state === DiffRowState.ADDED) &&
@@ -502,38 +514,38 @@ const App: React.FC<AppProps> = (props) => {
   ) || [];
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden text-slate-900 font-sans selection:bg-indigo-100">
+    <div className="app-container">
       {/* Sidebar Mobile Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
+          className="sidebar-overlay"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Navigation Sidebar */}
-      <aside className={`fixed lg:static inset-y-0 left-0 w-80 bg-slate-900 flex flex-col border-r border-slate-800 shadow-2xl z-50 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="p-8 lg:p-10 flex items-center justify-between">
-          <h2 className="text-white text-2xl lg:text-3xl font-black flex items-center gap-4 tracking-tighter cursor-default">
-            <div className="bg-gradient-to-tr from-indigo-500 to-violet-600 w-10 h-10 lg:w-12 lg:h-12 rounded-[1.25rem] flex items-center justify-center text-xs shadow-2xl shadow-indigo-500/40">
-              <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a3 3 0 003-3V6.741M17.03 3.394A9.002 9.002 0 004.516 17.657" /></svg>
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <h2 className="sidebar-brand">
+            <div className="sidebar-brand-icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a3 3 0 003-3V6.741M17.03 3.394A9.002 9.002 0 004.516 17.657" /></svg>
             </div>
             Multiverse
           </h2>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-400 p-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button onClick={() => setIsSidebarOpen(false)} className="sidebar-close-btn">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-6 space-y-3">
-          <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex justify-between items-center px-4">
+        <nav className="sidebar-nav">
+          <div className="sidebar-nav-header">
             <span>Environments</span>
-            <div className="flex gap-1">
-              <button onClick={handleImportProject} className="text-slate-400 hover:text-indigo-400 transition-colors p-1.5 rounded-lg hover:bg-slate-800" title="Import Project">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+            <div className="sidebar-action-icons">
+              <button onClick={handleImportProject} className="sidebar-action-btn import-btn" title="Import Project">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
               </button>
-              <button onClick={handleCreateProject} className="text-indigo-400 hover:text-indigo-300 transition-colors p-1.5 rounded-lg hover:bg-slate-800" title="New Project">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+              <button onClick={handleCreateProject} className="sidebar-action-btn new-btn" title="New Project">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
               </button>
             </div>
           </div>
@@ -541,170 +553,181 @@ const App: React.FC<AppProps> = (props) => {
             <button
               key={p.id}
               onClick={() => { setActiveProjectId(p.id); setIsSidebarOpen(false); }}
-              className={`w-full text-left p-4 lg:p-5 rounded-[1.5rem] transition-all group flex flex-col border ${p.id === activeProjectId ? 'bg-slate-800 text-white shadow-2xl border-slate-700' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 border-transparent'}`}
+              className={`sidebar-project-btn ${p.id === activeProjectId ? 'active' : ''}`}
             >
-              <div className="flex justify-between items-center w-full">
-                <span className="font-bold truncate text-sm">{p.name}</span>
-                <div className="flex gap-1">
+              <div className="sidebar-project-btn-header">
+                <span className="sidebar-project-name">{p.name}</span>
+                <div className="sidebar-project-status">
                   {p.rows.some(r => r.targetValue !== r.originalTargetValue) && (
-                    <span className="w-2.5 h-2.5 bg-amber-400 rounded-full shadow-[0_0_12px_rgba(251,191,36,0.6)] animate-pulse" />
+                    <span className="sidebar-project-dot modified animate-pulse" />
                   )}
                   {p.rows.some(r => r.sourceValue !== r.pastSourceValue) && (
-                    <span className="w-2.5 h-2.5 bg-rose-400 rounded-full shadow-[0_0_12px_rgba(251,18,36,0.6)] animate-pulse" />
+                    <span className="sidebar-project-dot unconfirmed animate-pulse" />
                   )}
                 </div>
               </div>
-              <span className="text-[10px] font-mono opacity-30 mt-2 uppercase tracking-widest">{p.rows.length || 0} strings manifested</span>
+              <span className="sidebar-project-strings">{p.rows.length || 0} strings manifested</span>
             </button>
           ))}
         </nav>
 
-        <div className="p-8 border-t border-slate-800">
+        <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <button
+            onClick={() => setIsSpreadsheetMode(!isSpreadsheetMode)}
+            className="settings-btn"
+            title="Swap UI View Style"
+          >
+            {isSpreadsheetMode ? (
+              <>
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '1.25rem', height: '1.25rem' }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                Rounded View
+              </>
+            ) : (
+              <>
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '1.25rem', height: '1.25rem' }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                Spreadsheet View
+              </>
+            )}
+          </button>
           <button
             onClick={() => setShowSettings(true)}
-            className="w-full py-4 px-6 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-3xl flex items-center gap-4 font-bold transition-all text-sm group"
+            className="settings-btn"
           >
-            <svg className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
             Settings
           </button>
         </div>
       </aside>
 
       {/* Main Content Canvas */}
-      <main style={{ height: "100%" }} className="flex-1 flex flex-col relative bg-slate-50 overflow-hidden">
+      <main className="main-canvas">
 
         {!activeProject ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-6 text-center">
-            <div className="w-24 h-24 bg-white rounded-[2.5rem] mb-8 shadow-sm flex items-center justify-center border border-slate-100">
-              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+          <div className="empty-view">
+            <div className="empty-icon-box">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
             </div>
-            <p className="font-black text-xl text-slate-400">MANIFEST MISSING</p>
-            <button onClick={handleCreateProject} className="mt-4 text-indigo-600 font-bold hover:underline">Launch first project</button>
+            <p className="empty-title">MANIFEST MISSING</p>
+            <button onClick={handleCreateProject} className="empty-btn">Launch first project</button>
           </div>
         ) : (
-          <div style={{ height: "100%" }}>
-            <header className="bg-white border-b border-slate-200 px-6 lg:px-12 pt-20 lg:pt-8 pb-6 lg:pb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 z-30 shadow-sm">
-              <div className="flex items-center gap-4 w-full lg:w-auto">
+          <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <header className="header-container">
+              <div className="project-title-container">
                 {isEditingName ? (
-                  <div className="flex items-center gap-2 w-full lg:w-auto">
-                    <input
-                      autoFocus
-                      className="bg-slate-50 border-2 border-indigo-200 rounded-2xl px-5 py-2.5 font-black text-2xl lg:text-3xl tracking-tighter outline-none focus:ring-8 focus:ring-indigo-500/5 w-full"
-                      value={editNameValue}
-                      onChange={e => setEditNameValue(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleRenameProject();
-                        if (e.key === 'Escape') setIsEditingName(false);
-                      }}
-                      onBlur={handleRenameProject}
-                    />
-                  </div>
+                  <input
+                    autoFocus
+                    className="project-title-input"
+                    value={editNameValue}
+                    onChange={e => setEditNameValue(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleRenameProject();
+                      if (e.key === 'Escape') setIsEditingName(false);
+                    }}
+                    onBlur={handleRenameProject}
+                  />
                 ) : (
-                  <div className="group flex items-center gap-4">
-                    <h2 onClick={() => setIsEditingName(true)} className="font-black text-2xl lg:text-4xl text-slate-900 tracking-tighter leading-none cursor-pointer hover:text-indigo-600 transition-colors">
+                  <div className="project-title-group">
+                    <h2 onClick={() => setIsEditingName(true)} className="project-title-text">
                       {activeProject.name}
                     </h2>
                     <button
                       onClick={() => setIsEditingName(true)}
-                      className="p-2 text-slate-300 hover:text-indigo-500 transition-colors lg:opacity-0 lg:group-hover:opacity-100 bg-slate-50 rounded-xl"
+                      className="project-edit-btn"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                     </button>
                   </div>
                 )}
-                <div className="hidden lg:flex items-center gap-2 ml-4">
-                  <span className="text-[10px] text-indigo-700 font-black bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-100/50">
-                    {activeProject.config.branch || 'main'}
-                  </span>
+                <div className="project-branch-badge">
+                  {activeProject.config.branch || 'main'}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleExportProject}
-                    title="Export Project as File"
-                    className="flex-none px-2 py-3.5 lg:px-2 lg:py-4 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-2xl border border-slate-100 flex items-center justify-center transition-all"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                  </button>
-                  <button
-                    onClick={handleCopyLink}
-                    title="Share with URL"
-                    className="flex-none px-2 py-3.5 lg:px-2 lg:py-4 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-2xl border border-slate-100 flex items-center justify-center transition-all"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
-                  </button>
-                  <button
-                    onClick={handleCopyRawJson}
-                    title="Copy Target JSON"
-                    className="flex-none px-2 py-3.5 lg:px-2 lg:py-4 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-2xl border border-slate-100 flex items-center justify-center transition-all"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-                  </button>
-                  <button
-                    onClick={e => { setShowDialogSuggestAll(true); }}
-                    disabled={loading || activeProject.rows.length === 0}
-                    className="flex-none p-3.5 lg:px-8 lg:py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-3 text-sm font-black disabled:opacity-50 transition-all active:scale-95"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                    <div className="max-xl:hidden">AI Suggest</div>
-                  </button>
-                </div>
+              <div className="project-actions-container">
+                <button
+                  onClick={handleExportProject}
+                  title="Export Project as File"
+                  className="btn btn-icon"
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                </button>
+                <button
+                  onClick={handleCopyLink}
+                  title="Share with URL"
+                  className="btn btn-icon"
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                </button>
+                <button
+                  onClick={handleCopyRawJson}
+                  title="Copy Target JSON"
+                  className="btn btn-icon"
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                </button>
+                <button
+                  onClick={e => { setShowDialogSuggestAll(true); }}
+                  disabled={loading || activeProject.rows.length === 0}
+                  className="btn btn-primary"
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  <div className="btn-label-collapse">AI Suggest</div>
+                </button>
                 <button
                   onClick={handlePushToGitHub}
                   disabled={loading || modifiedCount === 0 || !settings.githubToken}
-                  className="flex-none p-3.5 lg:px-8 lg:py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3 text-sm font-black disabled:opacity-50 transition-all active:scale-95"
+                  className="btn btn-success"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                  <div className="max-xl:hidden">Push</div>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                  <div className="btn-label-collapse">Push</div>
                 </button>
                 <button
                   onClick={() => setShowConfig(!showConfig)}
-                  className={`p-3.5 lg:p-4 rounded-2xl border transition-all ${showConfig ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-400 border-slate-200 shadow-sm hover:bg-slate-100'}`}
+                  className={`btn-config ${showConfig ? 'active' : ''}`}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                 </button>
               </div>
             </header>
 
             {showConfig && (
-              <div className="bg-white border-b border-slate-200 p-6 lg:p-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 animate-in fade-in slide-in-from-top-8 duration-500 z-20 shadow-2xl overflow-y-auto max-h-[75vh]">
-                <div className="space-y-8">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">Local Configuration</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Repo Owner</label>
+              <div className="config-panel animate-slide-down">
+                <div className="config-form-container">
+                  <h3 className="config-section-title">Local Configuration</h3>
+                  <div className="config-row-2col">
+                    <div className="form-group">
+                      <label className="form-label">Repo Owner</label>
                       <input
-                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                        className="form-input"
                         value={activeProject.config.owner}
                         onChange={e => updateActiveProject({ config: { ...activeProject.config, owner: e.target.value } })}
                         placeholder="e.g. google"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Repo Name</label>
+                    <div className="form-group">
+                      <label className="form-label">Repo Name</label>
                       <input
-                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                        className="form-input"
                         value={activeProject.config.repo}
                         onChange={e => updateActiveProject({ config: { ...activeProject.config, repo: e.target.value } })}
                         placeholder="e.g. gen-ui"
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Active Branch</label>
+                  <div className="config-row-2col">
+                    <div className="form-group">
+                      <label className="form-label">Active Branch</label>
                       <input
-                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                        className="form-input"
                         value={activeProject.config.branch}
                         onChange={e => updateActiveProject({ config: { ...activeProject.config, branch: e.target.value } })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Intelligence Core</label>
+                    <div className="form-group">
+                      <label className="form-label">Intelligence Core</label>
                       <select
-                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none appearance-none cursor-pointer"
+                        className="form-select"
                         value={activeProject.selectedModel}
                         onChange={e => updateActiveProject({ selectedModel: e.target.value as GeminiModel })}
                       >
@@ -716,53 +739,53 @@ const App: React.FC<AppProps> = (props) => {
                       </select>
                     </div>
                   </div>
-                  <div className="pt-6 flex flex-col sm:flex-row gap-4">
+                  <div className="config-actions-row">
                     <button
                       onClick={handleFetchFiles}
-                      className="flex-1 py-4 lg:py-5 bg-slate-900 text-white rounded-[2rem] font-black hover:bg-black transition-all text-xs uppercase tracking-widest shadow-2xl active:scale-95"
+                      className="btn-dark"
                     >
                       Update from GitHub
                     </button>
                     <button
                       onClick={handleDeleteProject}
-                      className="py-4 lg:py-5 px-8 bg-rose-50 text-rose-600 rounded-[2rem] font-black hover:bg-rose-100 transition-all text-xs uppercase tracking-widest border border-rose-100 active:scale-95"
+                      className="btn-danger-light"
                     >
                       Destroy Project
                     </button>
                     <button
                       onClick={handleRevertProject}
-                      className="py-4 lg:py-5 px-8 bg-amber-50 text-amber-600 rounded-[2rem] font-black hover:bg-amber-100 transition-all text-xs uppercase tracking-widest border border-amber-100 active:scale-95"
+                      className="btn-warning-light"
                     >
                       Revert Project
                     </button>
                   </div>
                 </div>
-                <div className="space-y-8">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">Path Mapping</h3>
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Source Locale JSON Path</label>
+                <div className="config-form-container">
+                  <h3 className="config-section-title">Path Mapping</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                    <div className="form-group">
+                      <label className="form-label">Source Locale JSON Path</label>
                       <input
-                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all font-mono"
+                        className="form-input form-input-mono"
                         value={activeProject.config.sourcePath}
                         onChange={e => updateActiveProject({ config: { ...activeProject.config, sourcePath: e.target.value } })}
                         placeholder="locales/en.json"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Target Locale JSON Path</label>
+                    <div className="form-group">
+                      <label className="form-label">Target Locale JSON Path</label>
                       <input
-                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all font-mono"
+                        className="form-input form-input-mono"
                         value={activeProject.config.targetPath}
                         onChange={e => updateActiveProject({ config: { ...activeProject.config, targetPath: e.target.value } })}
                         placeholder="locales/ko.json"
                       />
                     </div>
                   </div>
-                  <div className="space-y-2 mt-8">
-                    <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Project Note</label>
+                  <div className="form-group" style={{ marginTop: "2rem" }}>
+                    <label className="form-label">Project Note</label>
                     <textarea
-                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all min-h-[100px]"
+                      className="form-textarea"
                       value={activeProject.note || ''}
                       onChange={e => updateActiveProject({ note: e.target.value })}
                       placeholder="Context for translators"
@@ -772,56 +795,71 @@ const App: React.FC<AppProps> = (props) => {
               </div>
             )}
 
-            <div style={{ height: "100%" }} className="flex-1 overflow-hidden flex flex-col bg-slate-50/20">
-              <div className="px-6 lg:px-12 py-4 lg:py-6 bg-white shadow-md shadow-slate-100 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-start gap-4 sticky top-0 z-30">
-                <div className="relative w-full max-w-4xl">
+            <div className={`workspace-wrapper ${isSpreadsheetMode ? 'spreadsheet-layout' : ''}`}>
+              <div className="filter-bar">
+                {isSpreadsheetMode && (
+                  <div className="mobile-stats-row">
+                    <div className="mobile-stats-wrapper">
+                      {unconfirmedCount > 0 && <span className="search-stats-badge unconfirmed">{unconfirmedCount} Unconfirmed</span>}
+                      {modifiedCount > 0 && <span className="search-stats-badge modified">{modifiedCount} Modified</span>}
+                      <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : filteredDiffRows.length || 0} Entries</span>
+                    </div>
+                    <button
+                      onClick={() => setIsSearchCollapsedMobile(!isSearchCollapsedMobile)}
+                      className="mobile-search-toggle"
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </button>
+                  </div>
+                )}
+
+                <div className="search-input-wrapper" style={{ display: (isSpreadsheetMode && isSearchCollapsedMobile) ? "none" : "block" }}>
                   <input
                     type="text"
                     placeholder="Search strings, keys, or translations..."
                     value={searchTerms}
                     onChange={e => setSearchTerms(e.target.value)}
-                    className="w-full pl-12 lg:pl-14 pr-16 py-3.5 lg:py-4 bg-slate-50 border-none rounded-[1.5rem] text-sm outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner"
+                    className="search-input"
                   />
-                  <svg className="w-5 h-5 lg:w-6 lg:h-6 absolute left-4 lg:left-5 top-3 lg:top-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                   <button
                     onClick={() => setShowSearchHelp(!showSearchHelp)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-600/20 hover:text-indigo-500 transition-colors"
+                    className="search-help-btn"
                     title="Search Syntax Help"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </button>
 
                   {showSearchHelp && (
-                    <div className="absolute top-full left-0 mt-4 w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 z-60 animate-slide-down">
-                      <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-black text-slate-900 uppercase tracking-tighter">Search Syntax</h3>
-                        <button onClick={() => setShowSearchHelp(false)} className="text-slate-400 hover:text-slate-900">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                    <div className="search-help-dropdown animate-slide-down">
+                      <div className="search-help-header">
+                        <h3 className="search-help-title">Search Syntax</h3>
+                        <button onClick={() => setShowSearchHelp(false)} className="search-help-close">
+                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                       </div>
-                      <div className="grid grid-cols-1 gap-4 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <code className="bg-slate-100 px-2 py-1 rounded text-indigo-600 font-bold">||</code>
-                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">OR Operator</span>
+                      <div className="search-help-body custom-scrollbar">
+                        <div className="search-help-item">
+                          <div className="search-help-item-header">
+                            <code className="search-help-tag">||</code>
+                            <span className="search-help-tag-title">OR Operator</span>
                           </div>
-                          <p className="text-[11px] text-slate-400 leading-relaxed font-medium pl-2 border-l-2 border-slate-100">Multiple terms: <code className="text-slate-600">login || logout</code></p>
+                          <p className="search-help-desc">Multiple terms: <code>login || logout</code></p>
                         </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <code className="bg-slate-100 px-2 py-1 rounded text-indigo-600 font-bold">#reg</code>
-                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Regex Search</span>
+                        <div className="search-help-item">
+                          <div className="search-help-item-header">
+                            <code className="search-help-tag">#reg</code>
+                            <span className="search-help-tag-title">Regex Search</span>
                           </div>
-                          <p className="text-[11px] text-slate-400 leading-relaxed font-medium pl-2 border-l-2 border-slate-100">Use regular expressions: <code className="text-slate-600">^auth_.*#reg</code></p>
+                          <p className="search-help-desc">Use regular expressions: <code>^auth_.*#reg</code></p>
                         </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <code className="bg-slate-100 px-2 py-1 rounded text-indigo-600 font-bold">#key</code>
-                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Search Keys Only</span>
+                        <div className="search-help-item">
+                          <div className="search-help-item-header">
+                            <code className="search-help-tag">#key</code>
+                            <span className="search-help-tag-title">Search Keys Only</span>
                           </div>
-                          <p className="text-[11px] text-slate-400 leading-relaxed font-medium pl-2 border-l-2 border-slate-100">Ignore values: <code className="text-slate-600">error#key</code></p>
+                          <p className="search-help-desc">Ignore values: <code>error#key</code></p>
                         </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-6 pt-4 border-t border-slate-50">
+                        <div className="search-help-tags-grid">
                           {[
                             ...(viewMode === ViewMode.DIFFERENCES ? [
                               { tag: "#dremoved, #drem", desc: "Show removed rows in diff" },
@@ -841,9 +879,9 @@ const App: React.FC<AppProps> = (props) => {
                             { tag: "#aifetching, #aif", desc: "Awaiting AI core" },
                             { tag: "#inarray, #ina", desc: "Manifest arrays" }
                           ].map(item => (
-                            <div key={item.tag} className="space-y-1">
-                              <code className="text-indigo-600 font-black text-xs">{item.tag}</code>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">{item.desc}</p>
+                            <div key={item.tag} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                              <code className="search-help-tag" style={{ width: "fit-content" }}>{item.tag}</code>
+                              <p className="search-help-tag-title" style={{ fontSize: "9px" }}>{item.desc}</p>
                             </div>
                           ))}
                         </div>
@@ -851,293 +889,516 @@ const App: React.FC<AppProps> = (props) => {
                     </div>
                   )}
 
-
                 </div>
-                <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap no-scrollbar">
-                  {unconfirmedCount > 0 && <span className="text-rose-600 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 shadow-sm">{unconfirmedCount} Unconfirmed</span>}
-                  {modifiedCount > 0 && <span className="text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 shadow-sm">{modifiedCount} Modified</span>}
-                  <span className="hidden sm:inline w-1 h-1 bg-slate-200 rounded-full"></span>
-                  <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : filteredDiffRows.length || 0} Entries</span>
-                </div>
-
+                {(!isSpreadsheetMode) && (
+                  <div className="search-stats-container no-scrollbar">
+                    {unconfirmedCount > 0 && <span className="search-stats-badge unconfirmed">{unconfirmedCount} Unconfirmed</span>}
+                    {modifiedCount > 0 && <span className="search-stats-badge modified">{modifiedCount} Modified</span>}
+                    <span className="search-stats-divider"></span>
+                    <span>{viewMode === ViewMode.TRANSLATIONS ? filteredRows.length : filteredDiffRows.length || 0} Entries</span>
+                  </div>
+                )}
               </div>
 
               {/* PROJECT CONSOLE */}
-              <div className="-mb-5 right-0 max-lg:absolute max-lg:top-6 max-lg:right-6 lg:px-12 z-20">
-                <div className="bg-white shadow-md shadow-slate-100 border border-slate-100 flex w-fit gap-2 p-1.5 rounded-2xl relative">
+              <div className="project-console">
+                <div className="tab-container">
                   {!isConfirming ? (
                     <>
-                      <button onClick={() => setViewMode(ViewMode.TRANSLATIONS)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.TRANSLATIONS ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Translations</button>
-                      <button onClick={() => setViewMode(ViewMode.DIFFERENCES)} className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === ViewMode.DIFFERENCES ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Differences</button>
+                      <button onClick={() => setViewMode(ViewMode.TRANSLATIONS)} className={`tab-btn ${viewMode === ViewMode.TRANSLATIONS ? 'active' : ''}`}>Translations</button>
+                      <button onClick={() => setViewMode(ViewMode.DIFFERENCES)} className={`tab-btn ${viewMode === ViewMode.DIFFERENCES ? 'active' : ''}`}>Differences</button>
                     </>
                   ) : (
                     <>
-                      <button onClick={handleApplyDriftDiff} className="px-5 py-2 text-xs font-black rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all tracking-wide uppercase">Confirm All</button>
-                      <button onClick={() => { setIsConfirming(false); setDriftDiff(null); setViewMode(ViewMode.TRANSLATIONS); }} className="px-5 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase">Cancel</button>
+                      <button onClick={handleApplyDriftDiff} className="tab-btn confirm-diff">Confirm All</button>
+                      <button onClick={() => { setIsConfirming(false); setDriftDiff(null); setViewMode(ViewMode.TRANSLATIONS); }} className="tab-btn cancel-diff">Cancel</button>
                     </>
                   )}
                 </div>
               </div>
 
-              <div style={{ height: "100%" }} className="flex-1 overflow-auto px-4 lg:px-12">
+              <div className="rows-viewport" style={{ padding: isSpreadsheetMode ? 0 : undefined }}>
                 {viewMode === ViewMode.DIFFERENCES ? (
                   (!activeDiff || activeDiff.rows.length === 0) ? (
-                    <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-                      <div className="w-24 h-24 bg-white rounded-[3rem] mb-6 flex items-center justify-center border border-slate-100 text-slate-100 shadow-sm">
-                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <div className="empty-view">
+                      <div className="empty-icon-box">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                       </div>
-                      <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">No Differences</p>
-                      <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Fetch files to check for drift or view past applied updates.</p>
+                      <p className="empty-title">No Differences</p>
+                      <p className="dialog-form-desc" style={{ padding: 0 }}>Fetch files to check for drift or view past applied updates.</p>
                     </div>
                   ) : (
-                    <div style={{ height: "100%" }} className="space-y-6 lg:space-y-0 lg:bg-white lg:border lg:border-slate-200 lg:rounded-[3rem] lg:shadow-sm lg:overflow-hidden min-w-full">
-                      <div className="hidden lg:grid grid-cols-[320px_1fr_1fr_1fr] bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest p-8 sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
+                    <div className="grid-table-container">
+                      <div className={`grid-header ${viewMode === ViewMode.DIFFERENCES ? 'diff-layout' : ''}`}>
                         <div>ENTRY PATH</div>
                         <div>CURRENT SOURCE VALUE</div>
                         <div>UPDATED SOURCE VALUE</div>
                         <div>TARGET LOCALE</div>
                       </div>
-                      <div style={{ height: "100%" }} className="divide-y divide-slate-100 space-y-6 lg:space-y-0">
+                      <div style={{ height: "100%", display: 'flex', flexDirection: 'column' }}>
                         <Virtuoso
-                          style={{ height: "80%" }}
+                          style={{ height: "100%", minHeight: "600px" }}
                           data={filteredDiffRows}
-                          itemContent={(_, row) => (
-                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-4 gap-6 lg:gap-12 items-start transition-all ${row.state === DiffRowState.ADDED ? 'bg-emerald-50/20' : row.state === DiffRowState.REMOVED ? 'bg-rose-50/20' : 'bg-amber-50/20'}`}>
-                              <div className="w-full lg:w-auto overflow-hidden">
-                                <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
-                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key} <span className={`uppercase font-black text-[9px] ml-2 px-2 py-0.5 rounded-full w-fit inline-block ${row.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : row.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{row.state}</span></div>
-                              </div>
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Past Source Value</label>
-                                <div className="text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border border-slate-100/50 shadow-inner whitespace-pre-wrap text-slate-700 leading-relaxed font-black">{row.sourceValue}</div>
-                              </div>
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Updated Source Value</label>
-                                <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border border-slate-100/50 shadow-inner whitespace-pre-wrap text-slate-700 leading-relaxed font-black ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'border-blue-300 ring-8 ring-blue-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white shadow-sm'}`}>{row.updatedSourceValue}</div>
-                                {(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) && (
-                                  <span className="absolute -top-3 -right-3 bg-blue-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">CHANGED</span>
-                                )}
-                              </div>
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
-                                <textarea
-                                  className={`
-                                    w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black disabled:bg-slate-50 disabled:text-slate-400
-                                    ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'border-blue-300 ring-8 ring-blue-500/5 shadow-2xl' : 'border-green-300 ring-8 ring-green-500/5 shadow-2xl') : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}
-                                    ${viewingPast[row.key] ? 'bg-rose' : 'bg-white'}`
-                                  }
-                                  value={viewingPast[row.key] ? row.pastTargetValue : row.targetValue}
-                                  disabled={isConfirming || row.state === DiffRowState.REMOVED || viewingPast[row.key]}
-                                  onChange={e => {
-                                    if (!isConfirming && !viewingPast[row.key] && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
-                                      const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
+                          itemContent={(_, row) => {
+                            if (isSpreadsheetMode) {
+                              return (
+                                <div key={row.key} className={`row-card ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                  <div className="row-cell-sp">
+                                    <label className="row-label-mobile">Entry Path</label>
+                                    <div className="key-badge-container-sp">
+                                      {row.key} 
+                                      <span className={`diff-badge ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                        {row.state}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="row-cell-sp relative group">
+                                    <label className="row-label-mobile">Past Source Value</label>
+                                    <div className="source-box-sp">{row.sourceValue}</div>
+                                  </div>
+                                  <div className="row-cell-sp relative group">
+                                    <label className="row-label-mobile">Updated Source Value</label>
+                                    <div className={`source-box-sp ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'changed' : ''}`}>{row.updatedSourceValue}</div>
+                                    {(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) && (
+                                      <span className="badge-flag-sp changed">CHANGED</span>
+                                    )}
+                                  </div>
+                                  <div className="row-cell-sp relative group">
+                                    <label className="row-label-mobile">Target Locale</label>
+                                    <textarea
+                                      className={`edit-textarea-sp ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'diff-modified' : 'diff-translated') : ''} ${viewingPast[row.key] ? 'bg-rose-50' : ''}`}
+                                      value={viewingPast[row.key] ? row.pastTargetValue : row.targetValue}
+                                      disabled={isConfirming || row.state === DiffRowState.REMOVED || viewingPast[row.key]}
+                                      onChange={e => {
+                                        if (!isConfirming && !viewingPast[row.key] && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
+                                          const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
 
-                                      let newStack = activeProject.diffStack;
-                                      if (activeProject.diffStack && activeProject.diffStack.length > 0) {
-                                        newStack = [...activeProject.diffStack];
-                                        const lastDiff = { ...newStack[newStack.length - 1] };
-                                        const diffIdx = lastDiff.rows.findIndex(d => d.key === row.key);
-                                        if (diffIdx !== -1) {
-                                          lastDiff.rows[diffIdx] = { ...lastDiff.rows[diffIdx], targetValue: e.target.value };
-                                          newStack[newStack.length - 1] = lastDiff;
+                                          let newStack = activeProject.diffStack;
+                                          if (activeProject.diffStack && activeProject.diffStack.length > 0) {
+                                            newStack = [...activeProject.diffStack];
+                                            const lastDiff = { ...newStack[newStack.length - 1] };
+                                            const diffIdx = lastDiff.rows.findIndex(d => d.key === row.key);
+                                            if (diffIdx !== -1) {
+                                              lastDiff.rows[diffIdx] = { ...lastDiff.rows[diffIdx], targetValue: e.target.value };
+                                              newStack[newStack.length - 1] = lastDiff;
+                                            }
+                                          }
+                                          updateActiveProject({ rows: newRows, diffStack: newStack });
                                         }
-                                      }
-                                      updateActiveProject({ rows: newRows, diffStack: newStack });
-                                    }
-                                  }}
-                                />
-                                {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (row.pastTargetValue !== row.sourceValue ? (<div className="group">
-                                  {viewingPast[row.key] || <span className="absolute group-hover:hidden -top-3 -right-3 bg-blue-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">UPDATED</span>}
-                                  <button
-                                    className={`absolute ${viewingPast[row.key] ? 'block' : 'hidden'} group-hover:block -top-3 -right-3 bg-red-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl`}
-                                    onClick={e => {
-                                      setViewingPast({ ...viewingPast, [row.key]: !viewingPast[row.key] })
-                                    }}
-                                  >
-                                    {viewingPast[row.key] ? "VIEW CURRENT" : "VIEW PAST"}
-                                  </button>
-                                </div>) : (
-                                  <span className="absolute -top-3 -right-3 bg-green-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">TRANSLATED</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                                      }}
+                                    />
+                                    {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (row.pastTargetValue !== row.sourceValue ? (<div className="group">
+                                      {viewingPast[row.key] || <span className="badge-flag-sp updated">UPDATED</span>}
+                                      <button
+                                        className="unconfirm-btn-sp"
+                                        onClick={e => {
+                                          setViewingPast({ ...viewingPast, [row.key]: !viewingPast[row.key] })
+                                        }}
+                                      >
+                                        {viewingPast[row.key] ? "VIEW CURRENT" : "VIEW PAST"}
+                                      </button>
+                                    </div>) : (
+                                      <span className="badge-flag-sp translated">TRANSLATED</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div key={row.key} className={`row-card diff-layout ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                  <div className="key-cell">
+                                    <label className="row-label-mobile">Entry Path</label>
+                                    <div className="key-badge-container">
+                                      {row.key} 
+                                      <span className={`diff-badge ${row.state === DiffRowState.ADDED ? 'added' : row.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                        {row.state}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="value-cell">
+                                    <label className="row-label-mobile">Past Source Value</label>
+                                    <div className="source-box">{row.sourceValue}</div>
+                                  </div>
+                                  <div className="value-cell">
+                                    <label className="row-label-mobile">Updated Source Value</label>
+                                    <div className={`source-box ${(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) ? 'changed' : ''}`}>{row.updatedSourceValue}</div>
+                                    {(row.state === DiffRowState.MODIFIED && row.updatedSourceValue !== row.sourceValue) && (
+                                      <span className="badge-flag changed">CHANGED</span>
+                                    )}
+                                  </div>
+                                  <div className="value-cell view-past-toggle-group">
+                                    <label className="row-label-mobile">Target Locale</label>
+                                    <textarea
+                                      className={`edit-textarea ${(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) ? (row.pastTargetValue !== row.sourceValue ? 'diff-modified' : 'diff-translated') : ''} ${viewingPast[row.key] ? 'bg-rose' : ''}`}
+                                      value={viewingPast[row.key] ? row.pastTargetValue : row.targetValue}
+                                      disabled={isConfirming || row.state === DiffRowState.REMOVED || viewingPast[row.key]}
+                                      onChange={e => {
+                                        if (!isConfirming && !viewingPast[row.key] && (row.state === DiffRowState.ADDED || row.state === DiffRowState.MODIFIED)) {
+                                          const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: e.target.value } : r);
+
+                                          let newStack = activeProject.diffStack;
+                                          if (activeProject.diffStack && activeProject.diffStack.length > 0) {
+                                            newStack = [...activeProject.diffStack];
+                                            const lastDiff = { ...newStack[newStack.length - 1] };
+                                            const diffIdx = lastDiff.rows.findIndex(d => d.key === row.key);
+                                            if (diffIdx !== -1) {
+                                              lastDiff.rows[diffIdx] = { ...lastDiff.rows[diffIdx], targetValue: e.target.value };
+                                              newStack[newStack.length - 1] = lastDiff;
+                                            }
+                                          }
+                                          updateActiveProject({ rows: newRows, diffStack: newStack });
+                                        }
+                                      }}
+                                    />
+                                    {(row.state === DiffRowState.MODIFIED && row.pastTargetValue !== row.targetValue) && (row.pastTargetValue !== row.sourceValue ? (<div className="group">
+                                      {viewingPast[row.key] || <span className="badge-flag updated">UPDATED</span>}
+                                      <button
+                                        className={`view-past-toggle-btn ${viewingPast[row.key] ? 'visible' : ''}`}
+                                        onClick={e => {
+                                          setViewingPast({ ...viewingPast, [row.key]: !viewingPast[row.key] })
+                                        }}
+                                      >
+                                        {viewingPast[row.key] ? "VIEW CURRENT" : "VIEW PAST"}
+                                      </button>
+                                    </div>) : (
+                                      <span className="badge-flag translated">TRANSLATED</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          }}
                         />
                       </div>
                     </div>
                   )
                 ) : (
                   filteredRows.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-                      <div className="w-24 h-24 bg-white rounded-[3rem] mb-6 flex items-center justify-center border border-slate-100 text-slate-100 shadow-sm">
-                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                    <div className="empty-view">
+                      <div className="empty-icon-box">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                       </div>
                       {
                         activeProject.rows.length > 0
                           ? <div>
-                            <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">No Search Results</p>
-                            <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Try different search terms.</p>
+                            <p className="empty-title">No Search Results</p>
+                            <p className="dialog-form-desc" style={{ padding: 0 }}>Try different search terms.</p>
                           </div>
                           : <div>
-                            <p className="text-slate-400 font-black text-2xl uppercase italic tracking-tighter">Manifest Empty</p>
-                            <p className="text-sm text-slate-300 mt-2 font-bold max-w-xs leading-relaxed">Fetch files from your repository to start real-time localization.</p>
+                            <p className="empty-title">Manifest Empty</p>
+                            <p className="dialog-form-desc" style={{ padding: 0 }}>Fetch files from your repository to start real-time localization.</p>
                           </div>
                       }
                     </div>
                   ) : (
-                    <div style={{ height: "100%" }} className="space-y-0 lg:space-y-0 lg:bg-white lg:border lg:border-slate-200 lg:rounded-[3rem] lg:shadow-sm lg:overflow-hidden min-w-full">
+                    <div className="grid-table-container">
                       {/* Header for Desktop */}
-                      <div className="hidden lg:grid grid-cols-[160px_1fr_1fr_1fr] bg-white border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest p-8 sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
+                      <div className="grid-header">
                         <div>ENTRY PATH</div>
                         <div>SOURCE STRING</div>
                         <div>TARGET LOCALE</div>
                         <div>AI SUGGESTION</div>
                       </div>
 
-                      <div style={{ height: "100%" }} className="divide-y divide-slate-100 space-y-6 lg:space-y-0">
+                      <div style={{ height: "100%", display: 'flex', flexDirection: 'column' }}>
                         <Virtuoso
-                          style={{ height: "80%" }}
+                          style={{ height: "100%", minHeight: "600px" }}
                           data={filteredRows}
-                          itemContent={(_, row) => (
-                            <div key={row.key} className={`bg-white rounded-3xl lg:rounded-none border lg:border-none shadow-xl shadow-slate-900/5 lg:shadow-none p-6 lg:p-10 flex flex-col lg:grid lg:grid-cols-4 gap-6 lg:gap-12 items-start transition-all ${row.targetValue !== row.originalTargetValue ? 'bg-amber-50/10 lg:bg-amber-50/10 border-amber-100' : 'hover:bg-slate-50/20'}`}>
-                              {/* Key Column */}
-                              <div className="w-full lg:w-auto overflow-hidden">
-                                <label className="lg:hidden text-[9px] font-black text-slate-400 uppercase mb-3 block tracking-widest">Entry Path</label>
-                                <div className="text-[10px] lg:text-[11px] font-mono text-slate-400 break-all leading-relaxed font-bold tracking-tighter bg-slate-50 p-4 lg:bg-transparent lg:p-0 rounded-2xl border lg:border-none border-slate-100">{row.key}{keyDiffMap.get(row.key) && (<span className={`uppercase font-black text-[9px] ml-2 px-2 py-0.5 rounded-full w-fit inline-block ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'bg-emerald-100 text-emerald-700' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{keyDiffMap.get(row.key)?.state}</span>)}</div>
-                              </div>
-
-                              {/* Source Column */}
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Source String</label>
-                                <div className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] bg-slate-50/50 border ${row.pastSourceValue !== row.sourceValue ? 'border-rose-300 ring-8 ring-rose-500/5 bg-rose-500/5' : 'border-slate-100/50 shadow-inner'} whitespace-pre-wrap text-slate-700 leading-relaxed font-black`}>
-                                  {row.sourceValue}
-                                  {row.pastSourceValue !== row.sourceValue && (<>
-                                    <span className="absolute -top-3 -right-3 max-lg:hidden group-hover:hidden bg-rose-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">
-                                      Unconfirm
-                                    </span>
-                                    <button
-                                      onClick={() => {
-                                        const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
-                                        updateActiveProject({ rows: newRows });
-                                      }}
-                                      className="absolute -top-3 -right-3 lg:hidden group-hover:block bg-lime-500 text-[9px] lg:text-[10px] font-black text-white px-10 py-1.5 rounded-full border-4 border-white uppercase whitespace-nowrap shadow-2xl"
-                                    >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                    </button>
-                                  </>)}
-                                </div>
-                              </div>
-
-                              {/* Target Column */}
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-emerald-500 uppercase mb-3 block tracking-widest">Target Locale</label>
-                                <textarea
-                                  className={`w-full text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] border outline-none transition-all min-h-[120px] lg:min-h-[160px] leading-relaxed font-black ${row.targetValue !== row.originalTargetValue ? 'border-amber-300 ring-8 ring-amber-500/5 bg-white shadow-2xl' : 'border-slate-100 bg-white focus:ring-8 focus:ring-indigo-500/5 shadow-sm'}`}
-                                  value={row.targetValue}
-                                  style={{ resize: 'none' }}
-                                  onChange={e => {
-                                    const newRows = activeProject.rows.map(r => r.key === row.key ? {
-                                      ...r,
-                                      targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
-                                    } : r);
-                                    updateActiveProject({ rows: newRows });
-                                  }}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Tab') {
-                                      e.preventDefault();
-                                      const newRows = activeProject.rows.map(r => r.key === row.key ? {
-                                        ...r,
-                                        targetValue: row.originalTargetValue
-                                      } : r);
-                                      updateActiveProject({ rows: newRows });
-                                    }
-                                  }}
-                                  placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
-                                />
-                                {row.targetValue !== row.originalTargetValue && (
-                                  <span className="absolute -top-3 -right-3 bg-amber-500 text-[9px] lg:text-[10px] font-black text-white px-4 py-1.5 rounded-full border-4 border-white uppercase shadow-2xl">Modified</span>
-                                )}
-                              </div>
-
-                              {/* AI Column */}
-                              <div className="w-full relative group">
-                                <label className="lg:hidden text-[9px] font-black text-purple-500 uppercase mb-3 block tracking-widest">AI Suggestion</label>
-                                <div
-                                  className={`text-sm lg:text-sm p-5 lg:p-7 rounded-2xl lg:rounded-[2.5rem] min-h-[120px] lg:min-h-[160px] whitespace-pre-wrap transition-all leading-relaxed font-bold ${row.aiSuggestion && !rowAiLoading[row.key]
-                                    ? 'bg-indigo-50/50 border border-indigo-100 text-indigo-900 italic shadow-xl shadow-indigo-500/10'
-                                    : rowAiTemp[row.key] && rowAiLoading[row.key]
-                                      ? 'bg-slate-50/50 border border-slate-100 text-indigo-900 italic shadow-xl shadow-slate-500/10'
-                                      : 'bg-slate-50/30 border border-dashed border-slate-200 text-slate-200 flex items-center justify-center font-black text-[10px] uppercase tracking-widest opacity-50'}`}
-                                >
-                                  {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="w-2 h-2 centered relative">
-                                    <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
-                                    <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                  </div></div> : (rowAiLoading[row.key] ?
-                                    <div>Awaiting AI<div className="w-10 h-10 centered relative">
-                                      <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
-                                      <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                    </div></div> : "No AI"))}
-                                </div>
-                                {row.aiSuggestion && !rowAiLoading[row.key] ? (
-                                  <div>
-                                    <button
-                                      onClick={() => {
-                                        const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
-                                        updateActiveProject({ rows: newRows });
-                                      }}
-                                      className="absolute top-3 right-20 lg:top-6 lg:right-17 bg-white text-rose-600 font-black p-2 lg:p-3 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-rose-50 active:scale-75 hover:bg-rose-50"
-                                    >
-                                      <svg className="w-5 h-5 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
-                                        updateActiveProject({ rows: newRows });
-                                      }}
-                                      className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-white text-lime-600 p-3 lg:p-4 rounded-2xl shadow-2xl opacity-80 lg:opacity-0 lg:group-hover:opacity-80 transition-all border border-lime-50 active:scale-75 hover:bg-lime-50"
-                                    >
-                                      <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                    </button>
+                          itemContent={(_, row) => {
+                            if (isSpreadsheetMode) {
+                              return (
+                                <div key={row.key} className={`row-card ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}>
+                                  {/* Key Column */}
+                                  <div className="row-cell-sp">
+                                    <label className="row-label-mobile">Entry Path</label>
+                                    <div className="key-badge-container-sp">
+                                      {row.key}
+                                      {keyDiffMap.get(row.key) && (
+                                        <span className={`diff-badge ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'added' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                          {keyDiffMap.get(row.key)?.state}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                ) : (
-                                  rowAiLoading[row.key] || <button
-                                    onClick={async () => {
-                                      const updatedRows = [...activeProject.rows];
 
-                                      if (!settings.geminiApiKey) {
-                                        alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
-                                        setShowSettings(true);
-                                        return;
-                                      }
-                                      try {
-                                        setRowAiLoading({ ...rowAiLoading, [row.key]: true });
-                                        const suggestions = await getTranslationSuggestions(
-                                          activeProject.selectedModel, settings.geminiApiKey,
-                                          activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
-                                          activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
-                                          [{ key: row.key, value: row.sourceValue }],
-                                          activeProject.note?.replace("\n", ", ")
-                                        );
-                                        setRowAiLoading({ ...rowAiLoading, [row.key]: false });
-                                        Object.keys(suggestions).forEach(key => {
-                                          const rowIndex = updatedRows.findIndex(r => r.key === key);
-                                          if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
-                                        });
-                                        updateActiveProject({ rows: updatedRows });
-                                      } catch (error) {
-                                        console.error("Error fetching AI suggestion:", error);
-                                        alert("⚠️ Error fetching AI suggestion. Please check the console for details.");
-                                      } finally {
-                                      }
-                                    }}
-                                    className="absolute top-3 right-3 lg:top-6 lg:right-6 bg-indigo-600 text-white p-3 lg:p-4 rounded-2xl shadow-2xl opacity-100 lg:opacity-0 lg:group-hover:opacity-100 font-black transition-all border border-indigo-50 active:scale-75 hover:bg-indigo-700"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                                  {/* Source Column */}
+                                  <div className="row-cell-sp relative group">
+                                    <label className="row-label-mobile">Source String</label>
+                                    <div className={`source-box-sp ${row.pastSourceValue !== row.sourceValue ? 'unconfirm' : ''}`}>
+                                      {row.sourceValue}
+                                      {row.pastSourceValue !== row.sourceValue && (<>
+                                        <span className="badge-flag-sp unconfirmed">
+                                          Unconfirm
+                                        </span>
+                                        <button
+                                          onClick={() => {
+                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
+                                            updateActiveProject({ rows: newRows });
+                                          }}
+                                          className="unconfirm-btn-sp"
+                                        >
+                                          <svg style={{ width: "0.75rem", height: "0.75rem", display: "inline-block" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                        </button>
+                                      </>)}
+                                    </div>
+                                  </div>
+
+                                  {/* Target Column */}
+                                  <div className="row-cell-sp relative group">
+                                    <label className="row-label-mobile">Target Locale</label>
+                                    <textarea
+                                      className={`edit-textarea-sp ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}
+                                      value={row.targetValue}
+                                      onChange={e => {
+                                        const newRows = activeProject.rows.map(r => r.key === row.key ? {
+                                          ...r,
+                                          targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
+                                        } : r);
+                                        updateActiveProject({ rows: newRows });
+                                      }}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Tab') {
+                                          e.preventDefault();
+                                          const newRows = activeProject.rows.map(r => r.key === row.key ? {
+                                            ...r,
+                                            targetValue: row.originalTargetValue
+                                          } : r);
+                                          updateActiveProject({ rows: newRows });
+                                        }
+                                      }}
+                                      placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
+                                    />
+                                    {row.targetValue !== row.originalTargetValue && (
+                                      <span className="badge-flag-sp modified">Modified</span>
+                                    )}
+                                  </div>
+
+                                  {/* AI Column */}
+                                  <div className="row-cell-sp relative group">
+                                    <label className="row-label-mobile">AI Suggestion</label>
+                                    <div
+                                      className={`ai-suggest-box-sp ${row.aiSuggestion && !rowAiLoading[row.key] ? 'has-suggestion' : 'no-suggestion'}`}
+                                    >
+                                      {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="ai-loading-container" style={{ position: "relative", width: "1rem", height: "1rem", display: "inline-block" }}>
+                                        <div className="spinner-track" style={{ borderWidth: "2px" }}></div>
+                                        <div className="spinner-hand animate-spin" style={{ borderWidth: "2px" }}></div>
+                                      </div></div> : (rowAiLoading[row.key] ?
+                                        <div className="ai-loading-container" style={{ flexDirection: "row" }}>
+                                          Awaiting AI
+                                          <div style={{ position: "relative", width: "1rem", height: "1rem", display: "inline-block", marginLeft: "0.25rem" }}>
+                                            <div className="spinner-track" style={{ borderWidth: "2px" }}></div>
+                                            <div className="spinner-hand animate-spin" style={{ borderWidth: "2px" }}></div>
+                                          </div>
+                                        </div> : "No AI"))}
+                                    </div>
+                                    {row.aiSuggestion && !rowAiLoading[row.key] ? (
+                                      <div>
+                                        <button
+                                          onClick={() => {
+                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
+                                            updateActiveProject({ rows: newRows });
+                                          }}
+                                          className="ai-action-btn-sp discard"
+                                        >
+                                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
+                                            updateActiveProject({ rows: newRows });
+                                          }}
+                                          className="ai-action-btn-sp accept"
+                                        >
+                                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      rowAiLoading[row.key] || <button
+                                        onClick={async () => {
+                                          const updatedRows = [...activeProject.rows];
+
+                                          if (!settings.geminiApiKey) {
+                                            alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
+                                            setShowSettings(true);
+                                            return;
+                                          }
+                                          try {
+                                            setRowAiLoading({ ...rowAiLoading, [row.key]: true });
+                                            const suggestions = await getTranslationSuggestions(
+                                              activeProject.selectedModel, settings.geminiApiKey,
+                                              activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
+                                              activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
+                                              [{ key: row.key, value: row.sourceValue }],
+                                              activeProject.note?.replace("\n", ", ")
+                                            );
+                                            setRowAiLoading({ ...rowAiLoading, [row.key]: false });
+                                            Object.keys(suggestions).forEach(key => {
+                                              const rowIndex = updatedRows.findIndex(r => r.key === key);
+                                              if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
+                                            });
+                                            updateActiveProject({ rows: updatedRows });
+                                          } catch (error) {
+                                            console.error("Error fetching AI suggestion:", error);
+                                            alert("⚠️ Error fetching AI suggestion. Please check the console for details.");
+                                          } finally {
+                                          }
+                                        }}
+                                        className="ai-suggest-trigger-btn-sp"
+                                      >
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div key={row.key} className={`row-card ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}>
+                                  {/* Key Column */}
+                                  <div className="key-cell">
+                                    <label className="row-label-mobile">Entry Path</label>
+                                    <div className="key-badge-container">
+                                      {row.key}
+                                      {keyDiffMap.get(row.key) && (
+                                        <span className={`diff-badge ${keyDiffMap.get(row.key)?.state === DiffRowState.ADDED ? 'added' : keyDiffMap.get(row.key)?.state === DiffRowState.REMOVED ? 'removed' : 'modified'}`}>
+                                          {keyDiffMap.get(row.key)?.state}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Source Column */}
+                                  <div className="value-cell">
+                                    <label className="row-label-mobile">Source String</label>
+                                    <div className={`source-box ${row.pastSourceValue !== row.sourceValue ? 'unconfirm' : ''}`}>
+                                      {row.sourceValue}
+                                      {row.pastSourceValue !== row.sourceValue && (<>
+                                        <span className="badge-flag unconfirmed">
+                                          Unconfirm
+                                        </span>
+                                        <button
+                                          onClick={() => {
+                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, pastSourceValue: row.sourceValue } : r);
+                                            updateActiveProject({ rows: newRows });
+                                          }}
+                                          className="unconfirm-btn-overlay"
+                                        >
+                                          <svg style={{ width: "1.25rem", height: "1.25rem", display: "inline-block" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                        </button>
+                                      </>)}
+                                    </div>
+                                  </div>
+
+                                  {/* Target Column */}
+                                  <div className="value-cell">
+                                    <label className="row-label-mobile">Target Locale</label>
+                                    <textarea
+                                      className={`edit-textarea ${row.targetValue !== row.originalTargetValue ? 'modified' : ''}`}
+                                      value={row.targetValue}
+                                      onChange={e => {
+                                        const newRows = activeProject.rows.map(r => r.key === row.key ? {
+                                          ...r,
+                                          targetValue: e.target.value !== "\t" ? e.target.value : row.originalTargetValue
+                                        } : r);
+                                        updateActiveProject({ rows: newRows });
+                                      }}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Tab') {
+                                          e.preventDefault();
+                                          const newRows = activeProject.rows.map(r => r.key === row.key ? {
+                                            ...r,
+                                            targetValue: row.originalTargetValue
+                                          } : r);
+                                          updateActiveProject({ rows: newRows });
+                                        }
+                                      }}
+                                      placeholder={row.originalTargetValue === '' || !row.originalTargetValue ? "Add translation..." : "Tab to Revert: ".concat(row.originalTargetValue)}
+                                    />
+                                    {row.targetValue !== row.originalTargetValue && (
+                                      <span className="badge-flag modified">Modified</span>
+                                    )}
+                                  </div>
+
+                                  {/* AI Column */}
+                                  <div className="value-cell">
+                                    <label className="row-label-mobile">AI Suggestion</label>
+                                    <div
+                                      className={`ai-suggest-box ${row.aiSuggestion && !rowAiLoading[row.key] ? 'has-suggestion' : (rowAiTemp[row.key] && rowAiLoading[row.key] ? 'loading-temp' : 'no-suggestion')}`}
+                                    >
+                                      {row.aiSuggestion && !rowAiLoading[row.key] ? row.aiSuggestion : (rowAiTemp[row.key] && rowAiLoading[row.key] ? <div>{row.aiSuggestion || rowAiTemp[row.key]}<div className="ai-loading-container" style={{ position: "relative", width: "1rem", height: "1rem" }}>
+                                        <div className="spinner-track" style={{ borderWidth: "2px" }}></div>
+                                        <div className="spinner-hand animate-spin" style={{ borderWidth: "2px" }}></div>
+                                      </div></div> : (rowAiLoading[row.key] ?
+                                        <div className="ai-loading-container">
+                                          Awaiting AI
+                                          <div style={{ position: "relative", width: "2rem", height: "2rem" }}>
+                                            <div className="spinner-track" style={{ borderWidth: "4px" }}></div>
+                                            <div className="spinner-hand animate-spin" style={{ borderWidth: "4px" }}></div>
+                                          </div>
+                                        </div> : "No AI"))}
+                                    </div>
+                                    {row.aiSuggestion && !rowAiLoading[row.key] ? (
+                                      <div>
+                                        <button
+                                          onClick={() => {
+                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, aiSuggestion: "" } : r);
+                                            updateActiveProject({ rows: newRows });
+                                          }}
+                                          className="ai-action-btn discard"
+                                        >
+                                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18 18 6M6 6l12 12" /></svg>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            const newRows = activeProject.rows.map(r => r.key === row.key ? { ...r, targetValue: row.aiSuggestion || r.targetValue } : r);
+                                            updateActiveProject({ rows: newRows });
+                                          }}
+                                          className="ai-action-btn accept"
+                                        >
+                                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      rowAiLoading[row.key] || <button
+                                        onClick={async () => {
+                                          const updatedRows = [...activeProject.rows];
+
+                                          if (!settings.geminiApiKey) {
+                                            alert("⚠️ Gemini API Key Missing\nTo use AI suggestions, click the Settings button and use 'Authenticate Gemini' to select your API key.");
+                                            setShowSettings(true);
+                                            return;
+                                          }
+                                          try {
+                                            setRowAiLoading({ ...rowAiLoading, [row.key]: true });
+                                            const suggestions = await getTranslationSuggestions(
+                                              activeProject.selectedModel, settings.geminiApiKey,
+                                              activeProject.config.sourcePath.split('/').pop()?.replace('.json', '') || 'Source',
+                                              activeProject.config.targetPath.split('/').pop()?.replace('.json', '') || 'Target',
+                                              [{ key: row.key, value: row.sourceValue }],
+                                              activeProject.note?.replace("\n", ", ")
+                                            );
+                                            setRowAiLoading({ ...rowAiLoading, [row.key]: false });
+                                            Object.keys(suggestions).forEach(key => {
+                                              const rowIndex = updatedRows.findIndex(r => r.key === key);
+                                              if (rowIndex !== -1) updatedRows[rowIndex].aiSuggestion = suggestions[key];
+                                            });
+                                            updateActiveProject({ rows: updatedRows });
+                                          } catch (error) {
+                                            console.error("Error fetching AI suggestion:", error);
+                                            alert("⚠️ Error fetching AI suggestion. Please check the console for details.");
+                                          } finally {
+                                          }
+                                        }}
+                                        className="ai-suggest-trigger-btn"
+                                      >
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          }}
                         />
 
                       </div>
@@ -1151,82 +1412,82 @@ const App: React.FC<AppProps> = (props) => {
         {/* Mobile Header Toggle */}
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="lg:hidden absolute top-6 left-6 p-2.5 bg-white rounded-2xl shadow-xl z-30 border border-slate-200"
+          className="mobile-sidebar-toggle-btn"
         >
-          <svg className="w-6 h-6 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16m-7 6h7" /></svg>
         </button>
 
         {/* Global Settings Dialog */}
         {showSettings && (
-          <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-2xl z-[100] flex items-center justify-center p-6 lg:p-12">
-            <div className="bg-white w-full max-w-2xl rounded-[3rem] lg:rounded-[4.5rem] shadow-[0_64px_256px_-64px_rgba(0,0,0,0.7)] overflow-hidden animate-in zoom-in-95 duration-500 max-h-[95vh] overflow-y-auto">
-              <div className="p-10 lg:p-20">
-                <div className="flex justify-between items-center mb-12 lg:mb-16">
-                  <div>
-                    <h2 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tighter">Global Config</h2>
-                    <p className="text-[11px] text-slate-400 font-black uppercase tracking-[0.4em] mt-4">Local Memory Sync</p>
+          <div className="dialog-overlay">
+            <div className="dialog-modal">
+              <div className="dialog-content-wrapper">
+                <div className="dialog-modal-header">
+                  <div className="dialog-modal-title-group">
+                    <h2>Global Config</h2>
+                    <p className="dialog-modal-subtitle">Local Memory Sync</p>
                   </div>
-                  <button onClick={() => setShowSettings(false)} className="p-5 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-full transition-all active:scale-75 shadow-sm">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                  <button onClick={() => setShowSettings(false)} className="dialog-close-btn">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
 
-                <div className="space-y-12 lg:space-y-16">
+                <div className="dialog-form-sections">
                   <section>
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="w-2.5 h-10 bg-indigo-500 rounded-full"></div>
-                      <label className="text-[12px] font-black text-slate-500 uppercase tracking-widest">GitHub Auth Token</label>
+                    <div className="dialog-section-header">
+                      <div className="dialog-indicator-bar"></div>
+                      <label className="dialog-section-label">GitHub Auth Token</label>
                     </div>
                     <input
                       type="password"
                       placeholder="**************************************"
-                      className="w-full p-6 lg:p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all shadow-inner"
+                      className="form-input form-input-mono"
                       value={settings.githubToken}
                       onChange={e => setSettings({ ...settings, githubToken: e.target.value })}
                     />
-                    <p className="mt-5 px-6 text-[11px] text-slate-400 font-bold leading-relaxed opacity-70 italic">
+                    <p className="dialog-form-desc">
                       Manifest Encryption: Tokens are stored exclusively in your browser's private localStorage. We never route keys through proxy servers.
                     </p>
                   </section>
 
                   <section>
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="w-2.5 h-10 bg-indigo-500 rounded-full"></div>
-                      <label className="text-[12px] font-black text-slate-500 uppercase tracking-widest">Gemini API Key</label>
+                    <div className="dialog-section-header">
+                      <div className="dialog-indicator-bar"></div>
+                      <label className="dialog-section-label">Gemini API Key</label>
                     </div>
                     <input
                       type="password"
                       placeholder="**************************************"
-                      className="w-full p-6 lg:p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all shadow-inner"
+                      className="form-input form-input-mono"
                       value={settings.geminiApiKey}
                       onChange={e => setSettings({ ...settings, geminiApiKey: e.target.value })}
                     />
-                    <p className="mt-5 px-6 text-[11px] text-slate-400 font-bold leading-relaxed opacity-70 italic">
+                    <p className="dialog-form-desc">
                       Manifest Encryption: Tokens are stored exclusively in your browser's private localStorage. We never route keys through proxy servers.
                     </p>
                   </section>
 
                   <section>
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="w-2.5 h-10 bg-indigo-500 rounded-full"></div>
-                      <label className="text-[12px] font-black text-slate-500 uppercase tracking-widest">AI Suggestion Chunk Size: {settings.suggestionChunkSize}</label>
+                    <div className="dialog-section-header">
+                      <div className="dialog-indicator-bar"></div>
+                      <label className="dialog-section-label">AI Suggestion Chunk Size: {settings.suggestionChunkSize}</label>
                     </div>
                     <input
                       type="range"
                       min="1"
                       max="100"
                       step="1"
-                      className="w-full p-6 lg:p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all shadow-inner range-lg cursor-pointer"
+                      className="range-input"
                       value={settings.suggestionChunkSize}
                       onChange={e => setSettings({ ...settings, suggestionChunkSize: parseInt(e.target.value) })}
                     />
                   </section>
                 </div>
 
-                <div className="mt-16 lg:mt-20 pt-12 border-t border-slate-100">
+                <div className="dialog-footer-panel">
                   <button
                     onClick={() => setShowSettings(false)}
-                    className="w-full py-7 bg-slate-900 text-white rounded-[2.5rem] lg:rounded-[3rem] font-black uppercase tracking-widest text-[11px] active:scale-95 transition-all shadow-3xl shadow-slate-900/20"
+                    className="dialog-submit-btn primary"
                   >
                     Confirm & Sync Manifest
                   </button>
@@ -1238,53 +1499,53 @@ const App: React.FC<AppProps> = (props) => {
 
         {/* AI Suggestions Dialog */}
         {showDialogSuggestAll && (
-          <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-2xl z-[100] flex items-center justify-center p-6 lg:p-12">
-            <div className="bg-white w-full max-w-2xl rounded-[3rem] lg:rounded-[4.5rem] shadow-[0_64px_256px_-64px_rgba(0,0,0,0.7)] overflow-hidden animate-in zoom-in-95 duration-500 max-h-[95vh] overflow-y-auto">
-              <div className="p-10 lg:p-20 bg-indigo-50">
-                <div className="flex justify-between items-center mb-12 lg:mb-16">
-                  <div>
-                    <h2 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tighter">AI Suggest</h2>
-                    <p className="text-[11px] text-slate-400 font-black uppercase tracking-[0.4em] mt-4">for all of current filtered rows</p>
+          <div className="dialog-overlay">
+            <div className="dialog-modal">
+              <div className="dialog-content-wrapper bg-indigo-light">
+                <div className="dialog-modal-header">
+                  <div className="dialog-modal-title-group">
+                    <h2>AI Suggest</h2>
+                    <p className="dialog-modal-subtitle">for all of current filtered rows</p>
                   </div>
-                  <button onClick={() => setShowDialogSuggestAll(false)} className="p-5 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-full transition-all active:scale-75 shadow-sm">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                  <button onClick={() => setShowDialogSuggestAll(false)} className="dialog-close-btn">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
 
-                <div className="space-y-12 lg:space-y-16">
+                <div className="dialog-form-sections">
                   <section>
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="w-2.5 h-10 bg-indigo-500 rounded-full"></div>
-                      <label className="text-[12px] font-black text-slate-500 uppercase tracking-widest">Additional Instructions</label>
+                    <div className="dialog-section-header">
+                      <div className="dialog-indicator-bar"></div>
+                      <label className="dialog-section-label">Additional Instructions</label>
                     </div>
                     <input
                       type="text"
                       placeholder="e.g. Use formal language, local idioms, etc."
-                      className="w-full p-6 lg:p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all shadow-inner"
+                      className="form-input"
                       value={additionalInstructions}
                       onChange={e => setAdditionalInstructions(e.target.value)}
                     />
                   </section>
                   <section>
                     <button
-                      className={`w-full p-3 lg:p-4 ${replaceExistAISuggestions ? "text-amber-600 shadow-inner" : "text-slate-400 drop-shadow-lg"} bg-amber-50 hover:bg-amber-100 shadow-slate-500/20 border border-amber-100 rounded-[2.5rem] text-sm outline-none font-mono tracking-widest focus:ring-[16px] focus:ring-indigo-500/5 transition-all cursor-pointer items-center justify-item-start flex gap-3`}
+                      className={`toggle-option-btn ${replaceExistAISuggestions ? 'active' : ''}`}
                       onClick={() => setReplaceExistAISuggestions(!replaceExistAISuggestions)}
                     >
-                      <div className="w-6 h-6 lg:w-7 lg:h-7 items-center justify-center rounded-[0.5rem] bg-auto outline-dashed outline-2">
-                        {replaceExistAISuggestions && <svg className="w-6 h-6 lg:w-7 lg:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      <div className="toggle-checkbox-indicator">
+                        {replaceExistAISuggestions && <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                       </div>
-                      <div className="text-[12px] font-black uppercase tracking-widest">Replace Existing AI Suggestions</div>
+                      <div style={{ fontSize: "12px", fontWeight: "900", textTransform: "uppercase", letterSpacing: "0.1em" }}>Replace Existing AI Suggestions</div>
                     </button>
                   </section>
                 </div>
 
-                <div className="mt-16 lg:mt-20 pt-12 border-t border-slate-100">
+                <div className="dialog-footer-panel">
                   <button
                     onClick={() => {
                       setShowDialogSuggestAll(false);
                       handleSuggestAll();
                     }}
-                    className="w-full py-7 bg-indigo-900 text-white rounded-[2.5rem] lg:rounded-[3rem] font-black uppercase tracking-widest text-[11px] active:scale-95 transition-all shadow-3xl shadow-indigo-900/20"
+                    className="dialog-submit-btn indigo-modal"
                   >
                     Confirm & AI Suggest
                   </button>
@@ -1295,24 +1556,20 @@ const App: React.FC<AppProps> = (props) => {
         )}
 
         {loading && (
-          <div className="absolute inset-0 bg-white/75 backdrop-blur-3xl z-[200] flex items-center justify-center animate-in fade-in duration-700">
-            <div className="flex flex-col items-center gap-10 bg-white p-20 lg:p-28 rounded-[4.5rem] lg:rounded-[6rem] shadow-[0_128px_256px_-64px_rgba(0,0,0,0.25)] border border-slate-50 relative overflow-hidden group">
-              <div className="w-24 h-24 lg:w-32 lg:h-32 relative">
-                <div className="absolute inset-0 border-[8px] border-indigo-50 rounded-full"></div>
-                <div className="absolute inset-0 border-[8px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="loader-overlay">
+            <div className="loader-card">
+              <div className="loader-spinner-container">
+                <div className="spinner-track"></div>
+                <div className="spinner-hand animate-spin"></div>
               </div>
-              <div className="text-center">
-                <p className="font-black text-2xl lg:text-4xl text-slate-900 tracking-tighter italic scale-110">Synthesizing...</p>
-                <p className="text-[10px] text-slate-400 mt-5 uppercase tracking-[0.5em] font-black opacity-60">Synchronizing timeline data</p>
+              <div>
+                <p className="loader-title">Synthesizing...</p>
+                <p className="loader-subtitle">Synchronizing timeline data</p>
               </div>
             </div>
           </div>
         )}
       </main>
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
     </div>
   );
 };
