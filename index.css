@@ -2252,10 +2252,12 @@ body {
 }
 
 .spreadsheet-layout .row-cell-sp {
+  position: relative;
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  overflow: hidden;
 }
 
 @media (min-width: 1024px) {
